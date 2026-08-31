@@ -1,0 +1,820 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Data model Silver interactif — EDS CHU</title>
+  <style>
+    :root {
+      --bg: #f4f7fb;
+      --panel: #ffffff;
+      --ink: #172033;
+      --muted: #64748b;
+      --line: #d7dfeb;
+      --dim: #6d48b5;
+      --fact: #2264d1;
+      --factless: #0f766e;
+      --accent: #d97706;
+      --shadow: 0 12px 30px rgba(30, 48, 78, .10);
+    }
+
+    * { box-sizing: border-box; }
+
+    html, body { height: 100%; }
+
+    body {
+      margin: 0;
+      color: var(--ink);
+      background: var(--bg);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      overflow: hidden;
+    }
+
+    button { font: inherit; }
+
+    .app {
+      height: 100%;
+      display: grid;
+      grid-template-rows: auto 1fr;
+    }
+
+    .topbar {
+      position: relative;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+      padding: 16px 20px;
+      background: rgba(255, 255, 255, .96);
+      border-bottom: 1px solid var(--line);
+      box-shadow: 0 4px 16px rgba(30, 48, 78, .05);
+    }
+
+    .heading h1 {
+      margin: 0;
+      font-size: clamp(20px, 2vw, 28px);
+      letter-spacing: -.03em;
+    }
+
+    .heading p {
+      margin: 4px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .filters {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-button,
+    .icon-button {
+      border: 1px solid var(--line);
+      color: #334155;
+      background: #fff;
+      border-radius: 10px;
+      padding: 8px 11px;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .filter-button:hover,
+    .icon-button:hover { border-color: #9fb1c9; background: #f8fafc; }
+
+    .filter-button.active {
+      color: #fff;
+      border-color: var(--fact);
+      background: var(--fact);
+    }
+
+    .content {
+      min-height: 0;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 390px;
+    }
+
+    .stage-wrap {
+      position: relative;
+      min-width: 0;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 20% 15%, rgba(109, 72, 181, .08), transparent 25%),
+        radial-gradient(circle at 85% 70%, rgba(34, 100, 209, .08), transparent 26%),
+        var(--bg);
+    }
+
+    #modelSvg {
+      width: 100%;
+      height: 100%;
+      display: block;
+      touch-action: none;
+      user-select: none;
+      cursor: grab;
+    }
+
+    #modelSvg.panning { cursor: grabbing; }
+
+    .grid-line { stroke: #dce4ef; stroke-width: 1; opacity: .55; }
+    .edge { fill: none; stroke-width: 2.4; opacity: .68; transition: opacity .15s, stroke-width .15s; }
+    .edge.active { stroke-width: 4.2; opacity: 1; }
+    .edge.dimmed, .card.dimmed, .cardinality.dimmed { opacity: .10; }
+    .edge-hit { fill: none; stroke: transparent; stroke-width: 16; cursor: pointer; }
+    .card { cursor: move; transition: opacity .15s; }
+    .card .shell { fill: #fff; stroke: #a9b8cb; stroke-width: 2; filter: url(#shadow); }
+    .card.fact .shell { stroke: var(--fact); stroke-width: 2.7; }
+    .card.factless .shell { stroke: var(--factless); stroke-width: 2.7; }
+    .card.selected .shell { stroke-width: 5; }
+    .card-title { fill: #fff; font-size: 18px; font-weight: 750; }
+    .card-subtitle { fill: #667085; font-size: 12px; }
+    .field-text { fill: #25344b; font: 13px "DejaVu Sans Mono", ui-monospace, monospace; }
+    .field-kind { fill: #fff; font-size: 10px; font-weight: 800; text-anchor: middle; }
+    .divider { stroke: #e2e8f0; stroke-width: 1; }
+    .type-badge { fill: rgba(255,255,255,.18); }
+    .type-text { fill: #fff; font-size: 11px; font-weight: 800; text-anchor: middle; letter-spacing: .6px; }
+    .cardinality circle { fill: #fff; stroke-width: 2; }
+    .cardinality text { font-size: 11px; font-weight: 800; text-anchor: middle; dominant-baseline: central; }
+
+    .legend {
+      position: absolute;
+      left: 18px;
+      bottom: 18px;
+      display: flex;
+      gap: 14px;
+      align-items: center;
+      padding: 9px 12px;
+      color: #475569;
+      background: rgba(255,255,255,.93);
+      border: 1px solid var(--line);
+      border-radius: 11px;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .legend-item { display: flex; gap: 6px; align-items: center; }
+    .swatch { width: 12px; height: 12px; border-radius: 3px; }
+    .swatch.dim { background: var(--dim); }
+    .swatch.fact { background: var(--fact); }
+    .swatch.factless { background: var(--factless); }
+
+    .zoom-controls {
+      position: absolute;
+      z-index: 3;
+      right: 18px;
+      top: 18px;
+      display: flex;
+      gap: 6px;
+      padding: 6px;
+      background: rgba(255,255,255,.94);
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      box-shadow: var(--shadow);
+    }
+
+    .icon-button { min-width: 38px; padding: 7px 9px; font-weight: 750; }
+
+    .hint {
+      position: absolute;
+      left: 18px;
+      top: 18px;
+      max-width: 420px;
+      padding: 9px 12px;
+      color: #475569;
+      background: rgba(255,255,255,.91);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      box-shadow: var(--shadow);
+      font-size: 12px;
+      pointer-events: none;
+    }
+
+    .details {
+      min-width: 0;
+      overflow: auto;
+      padding: 20px;
+      background: #fff;
+      border-left: 1px solid var(--line);
+    }
+
+    .details h2 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+    .details h3 { margin: 22px 0 8px; font-size: 14px; text-transform: uppercase; letter-spacing: .06em; color: #475569; }
+    .details p, .details li { color: #475569; line-height: 1.55; font-size: 14px; }
+    .details ul { margin: 8px 0; padding-left: 19px; }
+    .details li + li { margin-top: 6px; }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; margin: 12px 0; }
+    .pill { padding: 5px 8px; color: #fff; border-radius: 999px; font-size: 11px; font-weight: 800; letter-spacing: .04em; }
+    .pill.dim { background: var(--dim); }
+    .pill.fact { background: var(--fact); }
+    .pill.factless { background: var(--factless); }
+    .pill.neutral { color: #334155; background: #e8eef6; }
+
+    .rule-card {
+      margin-top: 12px;
+      padding: 13px 14px;
+      border: 1px solid #cbd8ee;
+      border-radius: 12px;
+      background: #f6f9ff;
+    }
+
+    .rule-card strong { display: block; color: #194185; font-size: 13px; margin-bottom: 4px; }
+    .rule-card p { margin: 0; font-size: 13px; }
+
+    .field-list { display: grid; gap: 7px; }
+    .field-row { display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 8px; align-items: start; }
+    .field-row code { overflow-wrap: anywhere; color: #1e293b; font-size: 12px; }
+    .field-row small { display: block; margin-top: 2px; color: #64748b; line-height: 1.35; }
+    .key { display: inline-block; padding: 3px 5px; border-radius: 5px; color: #fff; background: #64748b; font-size: 10px; font-weight: 800; text-align: center; }
+    .key.PK { background: #b45309; }
+    .key.FK { background: #6d48b5; }
+    .key.MES { background: #2264d1; }
+    .key.DD { background: #475569; }
+    .key.ATTR { color: #475569; background: #e2e8f0; }
+
+    .relation-button {
+      width: 100%;
+      margin-top: 7px;
+      padding: 9px 10px;
+      text-align: left;
+      color: #334155;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      cursor: pointer;
+    }
+    .relation-button:hover { background: #f8fafc; border-color: #9fb1c9; }
+
+    @media (max-width: 980px) {
+      body { overflow: auto; }
+      .app { min-height: 100%; height: auto; }
+      .topbar { align-items: flex-start; flex-direction: column; }
+      .content { grid-template-columns: 1fr; grid-template-rows: 68vh auto; }
+      .details { border-left: 0; border-top: 1px solid var(--line); }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="heading">
+        <h1>Data model Silver — EDS CHU</h1>
+        <p>Modèle interactif fondé sur le schéma en étoile du cours</p>
+      </div>
+      <nav class="filters" aria-label="Filtrer le modèle par table de faits">
+        <button class="filter-button active" data-filter="all">Tout le modèle</button>
+        <button class="filter-button" data-filter="fact_stay">Séjours</button>
+        <button class="filter-button" data-filter="fact_diagnosis">Diagnostics</button>
+        <button class="filter-button" data-filter="fact_monitoring">Monitoring</button>
+      </nav>
+    </header>
+
+    <main class="content">
+      <section class="stage-wrap" aria-label="Schéma interactif">
+        <div class="hint">Clique sur une table pour obtenir son grain et sa justification. Déplace les blocs, zoome avec la molette et déplace le fond.</div>
+        <div class="zoom-controls" aria-label="Contrôles de zoom">
+          <button class="icon-button" id="zoomOut" title="Dézoomer">−</button>
+          <button class="icon-button" id="resetView" title="Réinitialiser la vue">Centrer</button>
+          <button class="icon-button" id="zoomIn" title="Zoomer">+</button>
+        </div>
+        <svg id="modelSvg" viewBox="0 0 1800 1080" role="img" aria-label="Constellation de faits Silver">
+          <defs id="svgDefs">
+            <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+              <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#1e304e" flood-opacity=".10"/>
+            </filter>
+            <pattern id="grid" width="32" height="32" patternUnits="userSpaceOnUse">
+              <path d="M 32 0 L 0 0 0 32" class="grid-line" fill="none"/>
+            </pattern>
+          </defs>
+          <rect id="background" x="-5000" y="-5000" width="10000" height="10000" fill="url(#grid)"/>
+          <g id="edgeLayer"></g>
+          <g id="nodeLayer"></g>
+        </svg>
+        <div class="legend" aria-hidden="true">
+          <span class="legend-item"><i class="swatch dim"></i>Dimension</span>
+          <span class="legend-item"><i class="swatch fact"></i>Fait mesurable</span>
+          <span class="legend-item"><i class="swatch factless"></i>Fait sans mesure</span>
+          <span>Relations 1 → N</span>
+        </div>
+      </section>
+
+      <aside class="details" id="details" aria-live="polite"></aside>
+    </main>
+  </div>
+
+  <script>
+    const SVG_NS = "http://www.w3.org/2000/svg";
+    const palette = {
+      dim_patient: "#c026d3",
+      dim_service: "#7c3aed",
+      dim_date: "#d97706",
+      dim_diagnosis: "#0f766e"
+    };
+
+    const technicalFields = [
+      { kind: "ATTR", name: "batch_id", description: "Identifiant du lot d'ingestion." },
+      { kind: "ATTR", name: "source_file", description: "Fichier ayant produit la ligne." },
+      { kind: "ATTR", name: "source_date", description: "Date du dépôt quotidien." },
+      { kind: "ATTR", name: "processed_at", description: "Horodatage du traitement Silver." }
+    ];
+
+    const nodes = [
+      {
+        id: "dim_patient", type: "dimension", x: 45, y: 145, w: 340,
+        title: "dim_patient", source: "patients.csv après pseudonymisation",
+        grain: "Une ligne par patient pseudonymisé.",
+        why: "Le patient est un axe d'analyse : on étudie une cohorte par âge, sexe ou région. Ce n'est pas un événement à compter.",
+        fields: [
+          { kind: "PK", name: "patient_key", description: "Pseudonyme stable ; remplace l'IPP en clair." },
+          { kind: "ATTR", name: "birth_year", description: "Année de naissance uniquement, conformément à la minimisation." },
+          { kind: "ATTR", name: "sex", description: "Valeur normalisée M ou F." },
+          { kind: "ATTR", name: "region_code", description: "Département ou région de résidence selon la source." }
+        ],
+        rules: ["Dédupliquer les retours quotidiens en conservant la version la plus récente.", "Ne jamais charger nom, prénom, NIR, IPP en clair ou date de naissance complète."],
+        kpis: ["Distribution des cohortes par âge et sexe", "Réadmissions d'un même patient"]
+      },
+      {
+        id: "dim_service", type: "dimension", x: 45, y: 500, w: 340,
+        title: "dim_service", source: "referentiels/services.csv",
+        grain: "Une ligne par service hospitalier.",
+        why: "Le service est le « par service » du cours : c'est donc une dimension et non un fait.",
+        fields: [
+          { kind: "PK", name: "service_code", description: "Code stable du service." },
+          { kind: "ATTR", name: "service_label", description: "Libellé lisible du service." }
+        ],
+        rules: ["Conserver un code unique et un libellé non vide."],
+        kpis: ["DMS par service", "Activité des urgences par service"]
+      },
+      {
+        id: "dim_date", type: "dimension", x: 1415, y: 145, w: 340,
+        title: "dim_date", source: "Calendrier généré dans l'entrepôt",
+        grain: "Une ligne par jour calendaire.",
+        why: "Jour, semaine, mois et année sont des axes d'analyse réutilisés par tous les faits.",
+        fields: [
+          { kind: "PK", name: "date_key", description: "Date au format Date." },
+          { kind: "ATTR", name: "day", description: "Jour du mois." },
+          { kind: "ATTR", name: "week", description: "Numéro de semaine." },
+          { kind: "ATTR", name: "month", description: "Numéro du mois." },
+          { kind: "ATTR", name: "year", description: "Année." }
+        ],
+        rules: ["Dans fact_stay, la même dimension joue deux rôles : date d'admission et date de sortie."],
+        kpis: ["Passages par jour", "Relevés par jour", "Évolution mensuelle"]
+      },
+      {
+        id: "dim_diagnosis", type: "dimension", x: 1415, y: 520, w: 340,
+        title: "dim_diagnosis", source: "referentiels/cim10.csv",
+        grain: "Une ligne par code CIM-10.",
+        why: "La pathologie est le « par diagnostic » de la prévalence. Le référentiel code → libellé est donc une dimension.",
+        fields: [
+          { kind: "PK", name: "diagnosis_code", description: "Code CIM-10." },
+          { kind: "ATTR", name: "diagnosis_label", description: "Libellé de la pathologie." }
+        ],
+        rules: ["Rejeter ou tracer les codes absents du référentiel CIM-10."],
+        kpis: ["Taille des cohortes par pathologie"]
+      },
+      {
+        id: "fact_stay", type: "fact", x: 515, y: 75, w: 430,
+        title: "fact_stay", source: "sejours.csv enrichi avec patient et service",
+        grain: "Une ligne par passage à l'hôpital.",
+        why: "Le séjour est un événement mesurable : on compte les passages et on calcule leur durée.",
+        fields: [
+          { kind: "DD", name: "stay_id", description: "Identifiant métier conservé directement dans le fait ; dimension dégénérée." },
+          { kind: "FK", name: "patient_key", description: "Relation vers dim_patient." },
+          { kind: "FK", name: "service_code", description: "Relation vers dim_service." },
+          { kind: "FK", name: "admission_date_key", description: "Rôle admission de dim_date." },
+          { kind: "FK", name: "discharge_date_key", description: "Rôle sortie de dim_date ; nullable pour un séjour en cours." },
+          { kind: "ATTR", name: "admission_ts", description: "Horodatage exact d'admission." },
+          { kind: "ATTR", name: "discharge_ts", description: "Horodatage exact de sortie, nullable." },
+          { kind: "ATTR", name: "admission_mode", description: "urgence, programme ou mutation." },
+          { kind: "ATTR", name: "discharge_mode", description: "domicile, transfert, décès…" },
+          { kind: "MES", name: "length_of_stay_hours", description: "Durée calculée pour les séjours terminés." },
+          { kind: "ATTR", name: "is_ongoing", description: "Vrai lorsque la sortie est vide." }
+        ],
+        rules: ["Rejeter discharge_ts < admission_ts.", "Conserver discharge_ts vide : le séjour est toujours en cours."],
+        kpis: ["Durée moyenne de séjour", "Passages aux urgences", "Réadmission à 30 jours"]
+      },
+      {
+        id: "fact_diagnosis", type: "factless", x: 515, y: 555, w: 430,
+        title: "fact_diagnosis", source: "diagnostics.json aplati puis enrichi via le séjour",
+        grain: "Une ligne par séjour, code CIM-10 et type de diagnostic.",
+        why: "L'association d'un diagnostic à un séjour est un événement comptable. C'est un fait sans mesure numérique : COUNT ou COUNT DISTINCT patient_key fournit la prévalence.",
+        fields: [
+          { kind: "DD", name: "stay_id", description: "Identifiant du séjour, dimension dégénérée." },
+          { kind: "FK", name: "diagnosis_code", description: "Relation vers dim_diagnosis ; participe à l'unicité." },
+          { kind: "ATTR", name: "diagnosis_type", description: "principal ou associe ; participe à l'unicité." },
+          { kind: "FK", name: "patient_key", description: "Recopié du séjour pour joindre directement dim_patient." },
+          { kind: "FK", name: "service_code", description: "Recopié du séjour pour joindre directement dim_service." },
+          { kind: "FK", name: "admission_date_key", description: "Date d'admission du séjour ; la source diagnostic ne fournit pas de date propre." }
+        ],
+        rules: ["Aplatir le tableau JSON : un élément du tableau devient une ligne.", "Dédupliquer sur stay_id + diagnosis_code + diagnosis_type."],
+        kpis: ["Prévalence par pathologie", "Cohortes par âge et sexe"]
+      },
+      {
+        id: "fact_monitoring", type: "fact", x: 1010, y: 730, w: 430,
+        title: "fact_monitoring", source: "monitoring.parquet enrichi via le séjour",
+        grain: "Une ligne par séjour et horodatage de relevé.",
+        why: "Un relevé est un événement mesurable. La table reste séparée car son volume est très supérieur aux autres sources.",
+        fields: [
+          { kind: "DD", name: "stay_id", description: "Identifiant du séjour, dimension dégénérée." },
+          { kind: "PK", name: "ts", description: "Horodatage du relevé ; avec stay_id, définit le grain." },
+          { kind: "FK", name: "patient_key", description: "Recopié du séjour pour joindre dim_patient directement." },
+          { kind: "FK", name: "service_code", description: "Recopié du séjour pour joindre dim_service directement." },
+          { kind: "FK", name: "measurement_date_key", description: "Date extraite de ts, relation vers dim_date." },
+          { kind: "MES", name: "heart_rate", description: "Fréquence cardiaque en bpm." },
+          { kind: "MES", name: "spo2", description: "Saturation en oxygène en %." },
+          { kind: "MES", name: "temp_c", description: "Température en degrés Celsius." }
+        ],
+        rules: ["Conserver FC entre 20 et 250 bpm.", "Conserver SpO2 entre 50 et 100 %.", "Conserver la température entre 30 et 45 °C.", "Les seuils d'alerte clinique ne sont pas fournis par le sujet."],
+        kpis: ["Nombre de relevés par jour", "Relevés en alerte après validation des seuils métier"]
+      }
+    ];
+
+    const relations = [
+      { from: "dim_patient", to: "fact_stay", field: "patient_key", role: "Un patient peut avoir plusieurs séjours." },
+      { from: "dim_patient", to: "fact_diagnosis", field: "patient_key", role: "Un patient peut recevoir plusieurs diagnostics." },
+      { from: "dim_patient", to: "fact_monitoring", field: "patient_key", role: "Un patient peut avoir plusieurs relevés." },
+      { from: "dim_service", to: "fact_stay", field: "service_code", role: "Un service accueille plusieurs séjours." },
+      { from: "dim_service", to: "fact_diagnosis", field: "service_code", role: "Un service est associé à plusieurs diagnostics enregistrés." },
+      { from: "dim_service", to: "fact_monitoring", field: "service_code", role: "Un service produit plusieurs relevés." },
+      { from: "dim_date", to: "fact_stay", field: "admission_date_key / discharge_date_key", role: "Une date concerne plusieurs admissions ou sorties ; la dimension joue deux rôles." },
+      { from: "dim_date", to: "fact_diagnosis", field: "admission_date_key", role: "Une date d'admission peut concerner plusieurs diagnostics de séjour." },
+      { from: "dim_date", to: "fact_monitoring", field: "measurement_date_key", role: "Une date regroupe plusieurs relevés." },
+      { from: "dim_diagnosis", to: "fact_diagnosis", field: "diagnosis_code", role: "Un code CIM-10 peut apparaître dans plusieurs événements diagnostic." }
+    ];
+
+    const nodeById = Object.fromEntries(nodes.map(node => [node.id, node]));
+    const svg = document.getElementById("modelSvg");
+    const defs = document.getElementById("svgDefs");
+    const edgeLayer = document.getElementById("edgeLayer");
+    const nodeLayer = document.getElementById("nodeLayer");
+    const details = document.getElementById("details");
+
+    let activeFilter = "all";
+    let selectedNode = null;
+    let selectedRelation = null;
+    let view = { x: 0, y: 0, w: 1800, h: 1080 };
+    let drag = null;
+    let pan = null;
+
+    function svgEl(tag, attrs = {}, text = "") {
+      const element = document.createElementNS(SVG_NS, tag);
+      Object.entries(attrs).forEach(([key, value]) => element.setAttribute(key, value));
+      if (text) element.textContent = text;
+      return element;
+    }
+
+    function typeColor(node) {
+      if (node.type === "dimension") return "#6d48b5";
+      if (node.type === "factless") return "#0f766e";
+      return "#2264d1";
+    }
+
+    function typeLabel(node) {
+      if (node.type === "dimension") return "DIMENSION";
+      if (node.type === "factless") return "FAIT SANS MESURE";
+      return "FAIT";
+    }
+
+    function visibleFields(node) {
+      return node.fields.slice(0, node.type === "fact" ? 8 : 7);
+    }
+
+    function nodeHeight(node) {
+      return 50 + visibleFields(node).length * 27 + 68;
+    }
+
+    function makeMarkers() {
+      Object.entries(palette).forEach(([id, color]) => {
+        const marker = svgEl("marker", { id: `arrow-${id}`, viewBox: "0 0 10 10", refX: "9", refY: "5", markerWidth: "7", markerHeight: "7", orient: "auto" });
+        marker.appendChild(svgEl("path", { d: "M0 0L10 5L0 10z", fill: color }));
+        defs.appendChild(marker);
+      });
+    }
+
+    function drawNodes() {
+      nodeLayer.replaceChildren();
+      nodes.forEach(node => {
+        const height = nodeHeight(node);
+        const group = svgEl("g", {
+          class: `card ${node.type === "fact" ? "fact" : node.type === "factless" ? "factless" : "dimension"}`,
+          "data-id": node.id,
+          transform: `translate(${node.x} ${node.y})`,
+          tabindex: "0",
+          role: "button",
+          "aria-label": `${typeLabel(node)} ${node.title}`
+        });
+        group.appendChild(svgEl("rect", { class: "shell", x: 0, y: 0, width: node.w, height, rx: 13 }));
+        group.appendChild(svgEl("rect", { x: 0, y: 0, width: node.w, height: 50, rx: 13, fill: typeColor(node) }));
+        group.appendChild(svgEl("rect", { x: 0, y: 36, width: node.w, height: 14, fill: typeColor(node) }));
+        group.appendChild(svgEl("text", { x: 18, y: 32, class: "card-title" }, node.title));
+
+        const badgeWidth = node.type === "factless" ? 142 : node.type === "dimension" ? 96 : 60;
+        group.appendChild(svgEl("rect", { x: node.w - badgeWidth - 14, y: 13, width: badgeWidth, height: 24, rx: 12, class: "type-badge" }));
+        group.appendChild(svgEl("text", { x: node.w - badgeWidth / 2 - 14, y: 29, class: "type-text" }, typeLabel(node)));
+
+        visibleFields(node).forEach((field, index) => {
+          const y = 78 + index * 27;
+          const kindColor = field.kind === "PK" ? "#b45309" : field.kind === "FK" ? "#6d48b5" : field.kind === "MES" ? "#2264d1" : field.kind === "DD" ? "#475569" : "#94a3b8";
+          group.appendChild(svgEl("rect", { x: 18, y: y - 14, width: 38, height: 18, rx: 5, fill: kindColor }));
+          group.appendChild(svgEl("text", { x: 37, y: y - 4, class: "field-kind" }, field.kind));
+          group.appendChild(svgEl("text", { x: 66, y, class: "field-text" }, field.name + (index === visibleFields(node).length - 1 && node.fields.length > visibleFields(node).length ? "  …" : "")));
+        });
+
+        const footerY = 61 + visibleFields(node).length * 27;
+        group.appendChild(svgEl("line", { x1: 18, y1: footerY, x2: node.w - 18, y2: footerY, class: "divider" }));
+        group.appendChild(svgEl("text", { x: 18, y: footerY + 25, class: "card-subtitle" }, node.grain));
+        group.appendChild(svgEl("text", { x: 18, y: footerY + 47, class: "card-subtitle" }, node.source));
+
+        group.addEventListener("pointerdown", event => startNodeDrag(event, node));
+        group.addEventListener("click", event => {
+          if (drag?.moved) return;
+          event.stopPropagation();
+          selectNode(node.id);
+        });
+        group.addEventListener("keydown", event => {
+          if (event.key === "Enter" || event.key === " ") { event.preventDefault(); selectNode(node.id); }
+        });
+        group.addEventListener("pointerenter", () => previewNode(node.id));
+        group.addEventListener("pointerleave", () => applyVisibility());
+        nodeLayer.appendChild(group);
+      });
+    }
+
+    function connectionPoint(from, to) {
+      const fromH = nodeHeight(from);
+      const toH = nodeHeight(to);
+      const fc = { x: from.x + from.w / 2, y: from.y + fromH / 2 };
+      const tc = { x: to.x + to.w / 2, y: to.y + toH / 2 };
+      const dx = tc.x - fc.x;
+      const dy = tc.y - fc.y;
+      let source, target;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        source = { x: dx > 0 ? from.x + from.w : from.x, y: fc.y };
+        target = { x: dx > 0 ? to.x : to.x + to.w, y: tc.y };
+      } else {
+        source = { x: fc.x, y: dy > 0 ? from.y + fromH : from.y };
+        target = { x: tc.x, y: dy > 0 ? to.y : to.y + toH };
+      }
+      return { source, target };
+    }
+
+    function edgePath(source, target) {
+      const dx = target.x - source.x;
+      const dy = target.y - source.y;
+      if (Math.abs(dx) > Math.abs(dy)) {
+        const bend = Math.max(75, Math.abs(dx) * .45) * Math.sign(dx || 1);
+        return `M${source.x},${source.y} C${source.x + bend},${source.y} ${target.x - bend},${target.y} ${target.x},${target.y}`;
+      }
+      const bend = Math.max(75, Math.abs(dy) * .45) * Math.sign(dy || 1);
+      return `M${source.x},${source.y} C${source.x},${source.y + bend} ${target.x},${target.y - bend} ${target.x},${target.y}`;
+    }
+
+    function drawEdges() {
+      edgeLayer.replaceChildren();
+      relations.forEach((relation, index) => {
+        const from = nodeById[relation.from];
+        const to = nodeById[relation.to];
+        const points = connectionPoint(from, to);
+        const pathData = edgePath(points.source, points.target);
+        const color = palette[relation.from];
+        const hit = svgEl("path", { d: pathData, class: "edge-hit", "data-edge": index });
+        const path = svgEl("path", {
+          d: pathData,
+          class: "edge",
+          stroke: color,
+          "marker-end": `url(#arrow-${relation.from})`,
+          "data-edge": index
+        });
+        hit.addEventListener("click", event => { event.stopPropagation(); selectRelation(index); });
+        hit.addEventListener("pointerenter", () => previewRelation(index));
+        hit.addEventListener("pointerleave", () => applyVisibility());
+        edgeLayer.append(hit, path);
+
+        addCardinality(points.source, "1", color, index);
+        addCardinality(points.target, "N", color, index);
+      });
+      applyVisibility();
+    }
+
+    function addCardinality(point, label, color, index) {
+      const group = svgEl("g", { class: "cardinality", "data-edge": index, transform: `translate(${point.x} ${point.y})` });
+      group.appendChild(svgEl("circle", { r: 10, stroke: color }));
+      group.appendChild(svgEl("text", { y: .5, fill: color }, label));
+      edgeLayer.appendChild(group);
+    }
+
+    function connectedNodeIds(factId) {
+      const ids = new Set([factId]);
+      relations.filter(r => r.to === factId).forEach(r => ids.add(r.from));
+      return ids;
+    }
+
+    function applyVisibility() {
+      const allowed = activeFilter === "all" ? new Set(nodes.map(n => n.id)) : connectedNodeIds(activeFilter);
+      document.querySelectorAll(".card").forEach(element => {
+        const id = element.dataset.id;
+        element.classList.toggle("dimmed", !allowed.has(id));
+        element.classList.toggle("selected", selectedNode === id);
+      });
+      document.querySelectorAll(".edge").forEach(element => {
+        const index = Number(element.dataset.edge);
+        const relation = relations[index];
+        const shown = activeFilter === "all" || relation.to === activeFilter;
+        const selected = selectedNode && (relation.from === selectedNode || relation.to === selectedNode);
+        element.classList.toggle("dimmed", !shown);
+        element.classList.toggle("active", shown && (selected || selectedRelation === index));
+      });
+      document.querySelectorAll(".edge-hit").forEach(element => {
+        const relation = relations[Number(element.dataset.edge)];
+        const shown = activeFilter === "all" || relation.to === activeFilter;
+        element.style.pointerEvents = shown ? "stroke" : "none";
+      });
+      document.querySelectorAll(".cardinality").forEach(element => {
+        const relation = relations[Number(element.dataset.edge)];
+        element.classList.toggle("dimmed", activeFilter !== "all" && relation.to !== activeFilter);
+      });
+    }
+
+    function previewNode(id) {
+      document.querySelectorAll(".edge").forEach(element => {
+        const relation = relations[Number(element.dataset.edge)];
+        element.classList.toggle("active", relation.from === id || relation.to === id);
+      });
+    }
+
+    function previewRelation(index) {
+      document.querySelectorAll(".edge").forEach(element => element.classList.toggle("active", Number(element.dataset.edge) === index));
+    }
+
+    function selectNode(id) {
+      selectedNode = id;
+      selectedRelation = null;
+      renderNodeDetails(nodeById[id]);
+      applyVisibility();
+    }
+
+    function selectRelation(index) {
+      selectedNode = null;
+      selectedRelation = index;
+      renderRelationDetails(relations[index]);
+      applyVisibility();
+    }
+
+    function renderWelcome() {
+      details.innerHTML = `
+        <h2>Comment lire ce modèle ?</h2>
+        <div class="pill-row"><span class="pill dim">DIMENSION</span><span class="pill fact">FAIT</span><span class="pill factless">FAIT SANS MESURE</span></div>
+        <div class="rule-card"><strong>Règle du cours</strong><p>Ce que l'on compte ou mesure est un <b>fait</b>. Le « par… » utilisé pour grouper est une <b>dimension</b>.</p></div>
+        <h3>Application au CHU</h3>
+        <ul>
+          <li><b>Événements :</b> un séjour, un diagnostic associé, un relevé de monitoring.</li>
+          <li><b>Axes d'analyse :</b> patient, service, date et pathologie.</li>
+          <li>Une dimension est du côté <b>1</b> ; chaque fait est du côté <b>N</b>.</li>
+          <li>Les dimensions sont partagées : on obtient une petite constellation de faits.</li>
+        </ul>
+        <h3>Pourquoi Silver ?</h3>
+        <p>Conformément au médaillon du cours, Silver contient les données détaillées nettoyées, dédupliquées, cohérentes et enrichies. Les KPI déjà agrégés restent en Gold.</p>
+        <div class="rule-card"><strong>Choix volontairement simple</strong><p>Pas de dim_mode ni de dim_stay : les modes restent des attributs du séjour et stay_id est une dimension dégénérée.</p></div>
+        <h3>Traçabilité</h3>
+        <p><code>batch_id</code>, <code>source_file</code>, <code>source_date</code> et <code>processed_at</code> sont présents dans chaque table. Les rejets vont dans <code>audit_quality_rejects</code>, hors du modèle analytique.</p>
+      `;
+    }
+
+    function renderNodeDetails(node) {
+      const typeClass = node.type === "dimension" ? "dim" : node.type === "factless" ? "factless" : "fact";
+      const allFields = [...node.fields, ...technicalFields];
+      const linked = relations.filter(r => r.from === node.id || r.to === node.id);
+      details.innerHTML = `
+        <h2>${node.title}</h2>
+        <div class="pill-row"><span class="pill ${typeClass}">${typeLabel(node)}</span><span class="pill neutral">${node.source}</span></div>
+        <div class="rule-card"><strong>Grain</strong><p>${node.grain}</p></div>
+        <h3>Pourquoi ce type ?</h3>
+        <p>${node.why}</p>
+        <h3>Colonnes</h3>
+        <div class="field-list">
+          ${allFields.map(field => `<div class="field-row"><span class="key ${field.kind}">${field.kind}</span><div><code>${field.name}</code><small>${field.description}</small></div></div>`).join("")}
+        </div>
+        <h3>Relations 1 → N</h3>
+        ${linked.map(relation => {
+          const other = relation.from === node.id ? relation.to : relation.from;
+          return `<button class="relation-button" data-jump="${other}"><b>${relation.from}</b> 1 → N <b>${relation.to}</b><br><small>Clé : ${relation.field}</small></button>`;
+        }).join("") || "<p>Aucune relation.</p>"}
+        <h3>Contrôles Silver</h3>
+        <ul>${node.rules.map(rule => `<li>${rule}</li>`).join("")}</ul>
+        <h3>KPI rendus possibles</h3>
+        <ul>${node.kpis.map(kpi => `<li>${kpi}</li>`).join("")}</ul>
+      `;
+      details.querySelectorAll("[data-jump]").forEach(button => button.addEventListener("click", () => selectNode(button.dataset.jump)));
+    }
+
+    function renderRelationDetails(relation) {
+      details.innerHTML = `
+        <h2>Relation 1 → N</h2>
+        <div class="pill-row"><span class="pill dim">${relation.from}</span><span class="pill fact">${relation.to}</span></div>
+        <div class="rule-card"><strong>Clé de jointure</strong><p><code>${relation.field}</code></p></div>
+        <h3>Justification</h3>
+        <p>${relation.role}</p>
+        <p>La dimension <b>${relation.from}</b> est du côté 1. Le fait <b>${relation.to}</b> est du côté N, car plusieurs événements peuvent partager la même valeur de dimension.</p>
+        <button class="relation-button" data-jump="${relation.from}">Ouvrir ${relation.from}</button>
+        <button class="relation-button" data-jump="${relation.to}">Ouvrir ${relation.to}</button>
+      `;
+      details.querySelectorAll("[data-jump]").forEach(button => button.addEventListener("click", () => selectNode(button.dataset.jump)));
+    }
+
+    function setFilter(filter) {
+      activeFilter = filter;
+      selectedNode = null;
+      selectedRelation = null;
+      document.querySelectorAll(".filter-button").forEach(button => button.classList.toggle("active", button.dataset.filter === filter));
+      if (filter === "all") renderWelcome(); else renderNodeDetails(nodeById[filter]);
+      applyVisibility();
+    }
+
+    function clientToSvg(clientX, clientY) {
+      const point = svg.createSVGPoint();
+      point.x = clientX;
+      point.y = clientY;
+      return point.matrixTransform(svg.getScreenCTM().inverse());
+    }
+
+    function startNodeDrag(event, node) {
+      if (event.button !== 0) return;
+      event.stopPropagation();
+      const point = clientToSvg(event.clientX, event.clientY);
+      drag = { node, dx: point.x - node.x, dy: point.y - node.y, moved: false };
+      event.currentTarget.setPointerCapture(event.pointerId);
+    }
+
+    svg.addEventListener("pointerdown", event => {
+      if (event.target.closest?.(".card") || event.button !== 0) return;
+      pan = { clientX: event.clientX, clientY: event.clientY, ...view };
+      svg.classList.add("panning");
+    });
+
+    svg.addEventListener("pointermove", event => {
+      if (drag) {
+        const point = clientToSvg(event.clientX, event.clientY);
+        const nx = point.x - drag.dx;
+        const ny = point.y - drag.dy;
+        if (Math.abs(nx - drag.node.x) + Math.abs(ny - drag.node.y) > 2) drag.moved = true;
+        drag.node.x = nx;
+        drag.node.y = ny;
+        const card = nodeLayer.querySelector(`[data-id="${drag.node.id}"]`);
+        card.setAttribute("transform", `translate(${drag.node.x} ${drag.node.y})`);
+        drawEdges();
+      } else if (pan) {
+        const rect = svg.getBoundingClientRect();
+        view.x = pan.x - (event.clientX - pan.clientX) * pan.w / rect.width;
+        view.y = pan.y - (event.clientY - pan.clientY) * pan.h / rect.height;
+        updateView();
+      }
+    });
+
+    window.addEventListener("pointerup", () => {
+      if (drag) setTimeout(() => { drag = null; }, 0);
+      pan = null;
+      svg.classList.remove("panning");
+    });
+
+    svg.addEventListener("click", event => {
+      if (event.target.id !== "background" || drag?.moved) return;
+      selectedNode = null;
+      selectedRelation = null;
+      renderWelcome();
+      applyVisibility();
+    });
+
+    function updateView() { svg.setAttribute("viewBox", `${view.x} ${view.y} ${view.w} ${view.h}`); }
+
+    function zoom(factor, centerX = view.x + view.w / 2, centerY = view.y + view.h / 2) {
+      const newW = Math.min(3200, Math.max(700, view.w * factor));
+      const newH = newW * 1080 / 1800;
+      const rx = (centerX - view.x) / view.w;
+      const ry = (centerY - view.y) / view.h;
+      view.x = centerX - rx * newW;
+      view.y = centerY - ry * newH;
+      view.w = newW;
+      view.h = newH;
+      updateView();
+    }
+
+    svg.addEventListener("wheel", event => {
+      event.preventDefault();
+      const point = clientToSvg(event.clientX, event.clientY);
+      zoom(event.deltaY > 0 ? 1.12 : .88, point.x, point.y);
+    }, { passive: false });
+
+    document.getElementById("zoomIn").addEventListener("click", () => zoom(.82));
+    document.getElementById("zoomOut").addEventListener("click", () => zoom(1.18));
+    document.getElementById("resetView").addEventListener("click", () => { view = { x: 0, y: 0, w: 1800, h: 1080 }; updateView(); });
+    document.querySelectorAll(".filter-button").forEach(button => button.addEventListener("click", () => setFilter(button.dataset.filter)));
+
+    makeMarkers();
+    drawNodes();
+    drawEdges();
+    renderWelcome();
+  </script>
+</body>
+</html>

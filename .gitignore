@@ -1,0 +1,24 @@
+# Données sources : elles ne doivent pas être publiées dans Git
+source-filestorage/
+
+# Supports fournis séparément
+*.pdf
+
+# Données et secrets locaux
+.env
+.env.*
+!.env.example
+data-lake/
+clickhouse-data/
+metabase-data/
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Outils / système
+.idea/
+.vscode/
+.DS_Store
