@@ -1,0 +1,70 @@
+name: eds-chu
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:26.8.1.2041
+    restart: unless-stopped
+    environment:
+      CLICKHOUSE_USER: ${CLICKHOUSE_USER:-eds_app}
+      CLICKHOUSE_PASSWORD: ${CLICKHOUSE_PASSWORD:-eds_local_password}
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+      TZ: Europe/Paris
+    ports:
+      - "127.0.0.1:${CLICKHOUSE_HTTP_PORT:-8123}:8123"
+      - "127.0.0.1:${CLICKHOUSE_NATIVE_PORT:-9000}:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+      - ./docker/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >-
+          clickhouse-client
+          --user "$${CLICKHOUSE_USER}"
+          --password "$${CLICKHOUSE_PASSWORD}"
+          --query "SELECT 1"
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 15s
+    ulimits:
+      nofile:
+        soft: 262144
+        hard: 262144
+    networks:
+      - eds_network
+
+  metabase:
+    image: metabase/metabase:v0.63.15.6
+    restart: unless-stopped
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    environment:
+      MB_DB_TYPE: h2
+      MB_DB_FILE: /metabase-data/metabase.db
+      MB_SITE_NAME: EDS CHU
+      MB_ANON_TRACKING_ENABLED: "false"
+      JAVA_TIMEZONE: Europe/Paris
+    ports:
+      - "127.0.0.1:${METABASE_PORT:-3000}:3000"
+    volumes:
+      - metabase_data:/metabase-data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:3000/api/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 45s
+    networks:
+      - eds_network
+
+networks:
+  eds_network:
+    driver: bridge
+
+volumes:
+  clickhouse_data:
+  clickhouse_logs:
+  metabase_data:

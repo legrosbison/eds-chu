@@ -1,0 +1,349 @@
+{
+  "generated_at": "2026-08-31T18:28:32.114752+00:00",
+  "source_root": "source-filestorage",
+  "inventory": {
+    "file_count": 14,
+    "total_bytes": 5489952
+  },
+  "patients": {
+    "summary": {
+      "rows": 16200,
+      "invalid_birth_dates": 0,
+      "future_birth_dates": 0,
+      "invalid_sex": 0,
+      "duplicate_patient_ids_within_file": 0,
+      "missing_patient_id": 0,
+      "missing_nir": 0,
+      "missing_nom": 0,
+      "missing_prenom": 0,
+      "missing_birth_date": 0,
+      "missing_sex": 0,
+      "missing_region_code": 0,
+      "distinct_patient_ids": 6000,
+      "patient_ids_repeated_across_deposits": 5400,
+      "rows_removed_by_latest_version_deduplication": 10200,
+      "patients_with_changed_silver_attributes": 0
+    },
+    "per_file": [
+      {
+        "date": "2026-08-26",
+        "file": "source-filestorage/patients/2026-08-26/patients.csv",
+        "bytes": 273456,
+        "rows": 4800,
+        "missing": {
+          "patient_id": 0,
+          "nir": 0,
+          "nom": 0,
+          "prenom": 0,
+          "birth_date": 0,
+          "sex": 0,
+          "region_code": 0
+        },
+        "duplicate_patient_ids_within_file": 0,
+        "invalid_birth_dates": 0,
+        "future_birth_dates": 0,
+        "invalid_sex": 0
+      },
+      {
+        "date": "2026-08-27",
+        "file": "source-filestorage/patients/2026-08-27/patients.csv",
+        "bytes": 307537,
+        "rows": 5400,
+        "missing": {
+          "patient_id": 0,
+          "nir": 0,
+          "nom": 0,
+          "prenom": 0,
+          "birth_date": 0,
+          "sex": 0,
+          "region_code": 0
+        },
+        "duplicate_patient_ids_within_file": 0,
+        "invalid_birth_dates": 0,
+        "future_birth_dates": 0,
+        "invalid_sex": 0
+      },
+      {
+        "date": "2026-08-28",
+        "file": "source-filestorage/patients/2026-08-28/patients.csv",
+        "bytes": 341737,
+        "rows": 6000,
+        "missing": {
+          "patient_id": 0,
+          "nir": 0,
+          "nom": 0,
+          "prenom": 0,
+          "birth_date": 0,
+          "sex": 0,
+          "region_code": 0
+        },
+        "duplicate_patient_ids_within_file": 0,
+        "invalid_birth_dates": 0,
+        "future_birth_dates": 0,
+        "invalid_sex": 0
+      }
+    ]
+  },
+  "references": {
+    "cim10": {
+      "file": "source-filestorage/referentiels/2026-08-26/cim10.csv",
+      "bytes": 363,
+      "rows": 10,
+      "missing_codes": 0,
+      "missing_labels": 0,
+      "duplicate_codes": 0
+    },
+    "services": {
+      "file": "source-filestorage/referentiels/2026-08-26/services.csv",
+      "bytes": 171,
+      "rows": 8,
+      "missing_codes": 0,
+      "missing_labels": 0,
+      "duplicate_codes": 0
+    }
+  },
+  "stays": {
+    "summary": {
+      "rows_accepted_silver": 12889,
+      "discharge_before_admission": 136,
+      "rows_rejected_by_silver_rules": 2111,
+      "finished_without_discharge_mode": 1992,
+      "ongoing_stays": 1190,
+      "rows": 15000,
+      "duplicate_stay_ids_within_file": 0,
+      "missing_stay_id": 0,
+      "missing_patient_id": 0,
+      "missing_service_code": 0,
+      "missing_admission_ts": 0,
+      "missing_discharge_ts": 1190,
+      "missing_admission_mode": 0,
+      "missing_discharge_mode": 3182,
+      "distinct_stay_ids": 15000,
+      "duplicate_stay_ids_across_all_files": 0,
+      "duration_hours": {
+        "min": 2.0,
+        "max": 288.0,
+        "mean": 145.92,
+        "median": 147.0
+      },
+      "admission_modes": {
+        "mutation": 4981,
+        "programme": 4945,
+        "urgence": 5074
+      },
+      "discharge_modes": {
+        "": 3182,
+        "deces": 2009,
+        "domicile": 5867,
+        "mutation": 1971,
+        "transfert": 1971
+      }
+    },
+    "per_file": [
+      {
+        "date": "2026-08-26",
+        "file": "source-filestorage/sejours/2026-08-26/sejours.csv",
+        "bytes": 413300,
+        "rows": 5000,
+        "missing": {
+          "stay_id": 0,
+          "patient_id": 0,
+          "service_code": 0,
+          "admission_ts": 0,
+          "discharge_ts": 390,
+          "admission_mode": 0,
+          "discharge_mode": 1062
+        },
+        "duplicate_stay_ids_within_file": 0,
+        "rows_accepted_silver": 4291,
+        "discharge_before_admission": 44,
+        "rows_rejected_by_silver_rules": 709,
+        "finished_without_discharge_mode": 672,
+        "ongoing_stays": 390
+      },
+      {
+        "date": "2026-08-27",
+        "file": "source-filestorage/sejours/2026-08-27/sejours.csv",
+        "bytes": 413006,
+        "rows": 5000,
+        "missing": {
+          "stay_id": 0,
+          "patient_id": 0,
+          "service_code": 0,
+          "admission_ts": 0,
+          "discharge_ts": 407,
+          "admission_mode": 0,
+          "discharge_mode": 1068
+        },
+        "duplicate_stay_ids_within_file": 0,
+        "ongoing_stays": 407,
+        "rows_accepted_silver": 4294,
+        "finished_without_discharge_mode": 661,
+        "rows_rejected_by_silver_rules": 706,
+        "discharge_before_admission": 50
+      },
+      {
+        "date": "2026-08-28",
+        "file": "source-filestorage/sejours/2026-08-28/sejours.csv",
+        "bytes": 413350,
+        "rows": 5000,
+        "missing": {
+          "stay_id": 0,
+          "patient_id": 0,
+          "service_code": 0,
+          "admission_ts": 0,
+          "discharge_ts": 393,
+          "admission_mode": 0,
+          "discharge_mode": 1052
+        },
+        "duplicate_stay_ids_within_file": 0,
+        "rows_accepted_silver": 4304,
+        "discharge_before_admission": 42,
+        "rows_rejected_by_silver_rules": 696,
+        "finished_without_discharge_mode": 659,
+        "ongoing_stays": 393
+      }
+    ]
+  },
+  "diagnostics": {
+    "summary": {
+      "diagnosis_rows": 37380,
+      "rows_accepted_silver": 32104,
+      "rows_on_rejected_silver_stay": 5276,
+      "rows_rejected_by_silver_rules": 5276,
+      "stay_entries": 15000,
+      "duplicate_diagnoses_within_file": 0,
+      "distinct_diagnosis_events": 37380,
+      "duplicate_diagnoses_across_all_files": 0,
+      "diagnoses_per_stay": {
+        "min": 1,
+        "max": 4,
+        "mean": 2.49,
+        "median": 2.0
+      }
+    },
+    "per_file": [
+      {
+        "date": "2026-08-26",
+        "file": "source-filestorage/diagnostics/2026-08-26/diagnostics.json",
+        "bytes": 1004550,
+        "stay_entries": 5000,
+        "duplicate_diagnoses_within_file": 0,
+        "diagnosis_rows": 12406,
+        "rows_accepted_silver": 10628,
+        "rows_on_rejected_silver_stay": 1778,
+        "rows_rejected_by_silver_rules": 1778
+      },
+      {
+        "date": "2026-08-27",
+        "file": "source-filestorage/diagnostics/2026-08-27/diagnostics.json",
+        "bytes": 1009538,
+        "stay_entries": 5000,
+        "duplicate_diagnoses_within_file": 0,
+        "diagnosis_rows": 12492,
+        "rows_accepted_silver": 10727,
+        "rows_on_rejected_silver_stay": 1765,
+        "rows_rejected_by_silver_rules": 1765
+      },
+      {
+        "date": "2026-08-28",
+        "file": "source-filestorage/diagnostics/2026-08-28/diagnostics.json",
+        "bytes": 1008958,
+        "stay_entries": 5000,
+        "duplicate_diagnoses_within_file": 0,
+        "diagnosis_rows": 12482,
+        "rows_accepted_silver": 10749,
+        "rows_on_rejected_silver_stay": 1733,
+        "rows_rejected_by_silver_rules": 1733
+      }
+    ]
+  },
+  "monitoring": {
+    "summary": {
+      "rows_accepted_silver": 56315,
+      "timestamp_outside_deposit_date": 48648,
+      "heart_rate_out_of_range": 1369,
+      "spo2_out_of_range": 1369,
+      "rows_rejected_by_required_quality_rules": 1369,
+      "rows_rejected_by_all_silver_rules": 10362,
+      "rows_on_rejected_silver_stay": 9192,
+      "timestamp_after_discharge": 520,
+      "rows_rejected_by_stay_window_rule": 520,
+      "rows": 66677,
+      "duplicate_stay_timestamp_within_file": 0,
+      "distinct_monitoring_events": 66677,
+      "duplicate_stay_timestamp_across_all_files": 0,
+      "heart_rate": {
+        "min": 0,
+        "max": 500,
+        "mean": 81.16,
+        "median": 77
+      },
+      "spo2": {
+        "min": 0,
+        "max": 120,
+        "mean": 97.01,
+        "median": 98
+      },
+      "temp_c": {
+        "min": 36.4,
+        "max": 40.0,
+        "mean": 37.06,
+        "median": 37.0
+      }
+    },
+    "per_file": [
+      {
+        "date": "2026-08-26",
+        "file": "source-filestorage/monitoring/2026-08-26/monitoring.parquet",
+        "bytes": 105091,
+        "rows": 24631,
+        "row_groups": 1,
+        "duplicate_stay_timestamp_within_file": 0,
+        "rows_accepted_silver": 21176,
+        "timestamp_outside_deposit_date": 17908,
+        "heart_rate_out_of_range": 486,
+        "spo2_out_of_range": 486,
+        "rows_rejected_by_required_quality_rules": 486,
+        "rows_rejected_by_all_silver_rules": 3455,
+        "rows_on_rejected_silver_stay": 3028,
+        "timestamp_after_discharge": 96,
+        "rows_rejected_by_stay_window_rule": 96
+      },
+      {
+        "date": "2026-08-27",
+        "file": "source-filestorage/monitoring/2026-08-27/monitoring.parquet",
+        "bytes": 97754,
+        "rows": 22190,
+        "row_groups": 1,
+        "duplicate_stay_timestamp_within_file": 0,
+        "rows_on_rejected_silver_stay": 3507,
+        "rows_rejected_by_all_silver_rules": 3905,
+        "timestamp_outside_deposit_date": 16336,
+        "rows_accepted_silver": 18285,
+        "heart_rate_out_of_range": 479,
+        "spo2_out_of_range": 479,
+        "rows_rejected_by_required_quality_rules": 479,
+        "timestamp_after_discharge": 351,
+        "rows_rejected_by_stay_window_rule": 351
+      },
+      {
+        "date": "2026-08-28",
+        "file": "source-filestorage/monitoring/2026-08-28/monitoring.parquet",
+        "bytes": 101141,
+        "rows": 19856,
+        "row_groups": 1,
+        "duplicate_stay_timestamp_within_file": 0,
+        "rows_accepted_silver": 16854,
+        "heart_rate_out_of_range": 404,
+        "spo2_out_of_range": 404,
+        "rows_rejected_by_required_quality_rules": 404,
+        "rows_rejected_by_all_silver_rules": 3002,
+        "timestamp_outside_deposit_date": 14404,
+        "rows_on_rejected_silver_stay": 2657,
+        "timestamp_after_discharge": 73,
+        "rows_rejected_by_stay_window_rule": 73
+      }
+    ]
+  }
+}
