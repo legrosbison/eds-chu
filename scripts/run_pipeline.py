@@ -19,6 +19,9 @@ from ingest_lake import ingest, load_env_file, load_manifest, pseudonymization_s
 
 ROOT = Path(__file__).resolve().parents[1]
 
+# Les deux dictionnaires ci-dessous disent simplement dans quel ordre charger
+# les fichiers. Les référentiels passent avant les séjours, puis les données qui
+# dépendent des séjours passent en dernier.
 BRONZE_CONFIG: dict[str, dict[str, Any]] = {
     "services": {"table": "bronze.services", "priority": 10},
     "cim10": {"table": "bronze.cim10", "priority": 11},
@@ -79,11 +82,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--source", type=Path, default=ROOT / "source-filestorage")
     parser.add_argument("--lake", type=Path, default=ROOT / "data-lake")
     parser.add_argument("--env-file", type=Path, default=ROOT / ".env")
-    parser.add_argument("--skip-lake", action="store_true")
-    parser.add_argument("--skip-bronze", action="store_true")
-    parser.add_argument("--skip-silver", action="store_true")
+    parser.add_argument(
+        "--step",
+        choices=("all", "lake", "bronze", "silver"),
+        default="all",
+        help="Étape à lancer (par défaut : tout le pipeline)",
+    )
     return parser.parse_args()
 
+
+# ---------------------------------------------------------------------------
+# Connexion ClickHouse
+# ---------------------------------------------------------------------------
 
 class ClickHouseClient:
     def __init__(self, url: str, user: str, password: str) -> None:
@@ -140,6 +150,7 @@ def clickhouse_client(env_file: Path) -> ClickHouseClient:
 
 
 def bootstrap(client: ClickHouseClient) -> None:
+    """Créer les tables si elles n'existent pas encore."""
     for relative in (
         "sql/00_audit_tables.sql",
         "sql/10_bronze_tables.sql",
@@ -149,6 +160,7 @@ def bootstrap(client: ClickHouseClient) -> None:
 
 
 def successful_manifest_entries(lake: Path) -> list[dict[str, Any]]:
+    """Lister les fichiers correctement copiés dans le Lake."""
     manifest_path = lake / "_state" / "ingestion-manifest.json"
     manifest = load_manifest(manifest_path)
     entries = [
@@ -180,6 +192,10 @@ def latest_status(
         {"batch_id": batch_id, "target_table": target_table},
     )
 
+
+# ---------------------------------------------------------------------------
+# Étape Bronze : fichiers du Lake -> tables typées
+# ---------------------------------------------------------------------------
 
 def record_bronze_status(
     client: ClickHouseClient,
@@ -297,6 +313,7 @@ def bronze_insert_query(domain: str) -> str:
 
 
 def load_bronze(client: ClickHouseClient, lake: Path, entries: list[dict[str, Any]]) -> None:
+    """Charger chaque fichier une seule fois dans sa table Bronze."""
     for entry in entries:
         domain = entry["domain"]
         target_table = BRONZE_CONFIG[domain]["table"]
@@ -339,6 +356,10 @@ def load_bronze(client: ClickHouseClient, lake: Path, entries: list[dict[str, An
             raise
 
 
+# ---------------------------------------------------------------------------
+# Étape Silver : nettoyage SQL -> dimensions et faits
+# ---------------------------------------------------------------------------
+
 def record_silver_status(
     client: ClickHouseClient,
     batch_id: str,
@@ -371,6 +392,7 @@ def record_silver_status(
 def transform_silver(
     client: ClickHouseClient, entries: list[dict[str, Any]]
 ) -> None:
+    """Exécuter les fichiers SQL Silver dans l'ordre de leurs dépendances."""
     ordered = sorted(
         entries,
         key=lambda item: (
@@ -438,20 +460,27 @@ def transform_silver(
             raise
 
 
+# ---------------------------------------------------------------------------
+# Pipeline principal : Lake, puis Bronze, puis Silver
+# ---------------------------------------------------------------------------
+
 def main() -> None:
     args = parse_args()
     load_env_file(args.env_file)
-    if not args.skip_lake:
+
+    if args.step in {"all", "lake"}:
         secret = pseudonymization_secret(args.env_file)
         summary = ingest(args.source, args.lake, secret)
         print("LAKE " + " ".join(f"{key}={value}" for key, value in summary.items()))
+    if args.step == "lake":
+        return
 
     client = clickhouse_client(args.env_file)
     bootstrap(client)
     entries = successful_manifest_entries(args.lake)
-    if not args.skip_bronze:
+    if args.step in {"all", "bronze"}:
         load_bronze(client, args.lake, entries)
-    if not args.skip_silver:
+    if args.step in {"all", "silver"}:
         transform_silver(client, entries)
 
 

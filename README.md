@@ -97,9 +97,13 @@ une partie seulement :
 
 ```bash
 python3 scripts/ingest_lake.py --dry-run
-python3 scripts/run_pipeline.py --skip-lake
-python3 scripts/run_pipeline.py --skip-bronze
+python3 scripts/run_pipeline.py --step lake
+python3 scripts/run_pipeline.py --step bronze
+python3 scripts/run_pipeline.py --step silver
 ```
+
+Pour débuter, retenez seulement `python3 scripts/run_pipeline.py` : les options
+par étape servent surtout à comprendre ou à reprendre un traitement.
 
 Le fonctionnement, les règles de reprise et les volumes contrôlés sont détaillés
 dans [la documentation du pipeline](docs/pipeline-lake-bronze-silver.md).

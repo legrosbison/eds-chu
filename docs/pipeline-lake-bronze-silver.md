@@ -182,11 +182,14 @@ ORDER BY source_table, count() DESC;
 # Voir ce que la copie Lake ferait, sans écrire de fichier
 python3 scripts/ingest_lake.py --dry-run
 
-# Rejouer Bronze et Silver à partir du Lake existant
-python3 scripts/run_pipeline.py --skip-lake
+# Exécuter uniquement la copie dans le Lake
+python3 scripts/run_pipeline.py --step lake
 
-# Rejouer seulement Silver à partir de Bronze
-python3 scripts/run_pipeline.py --skip-lake --skip-bronze
+# Exécuter uniquement le chargement Bronze depuis le Lake
+python3 scripts/run_pipeline.py --step bronze
+
+# Exécuter uniquement les transformations Silver depuis Bronze
+python3 scripts/run_pipeline.py --step silver
 
 # Lancer les tests de pseudonymisation et d'idempotence
 python3 -m unittest discover -s tests -v
