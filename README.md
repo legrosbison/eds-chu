@@ -14,11 +14,11 @@ docker compose ps
 
 Services disponibles :
 
-| Service | Adresse | Usage |
-|---|---|---|
-| ClickHouse HTTP | <http://localhost:8123/play> | Console SQL |
-| ClickHouse natif | `localhost:9000` | Connexion des clients |
-| Metabase | <http://localhost:3000> | Dashboards |
+| Service          | Adresse                      | Usage                 |
+| ---------------- | ---------------------------- | --------------------- |
+| ClickHouse HTTP  | <http://localhost:8123/play> | Console SQL           |
+| ClickHouse natif | `localhost:9000`             | Connexion des clients |
+| Metabase         | <http://localhost:3000>      | Dashboards            |
 
 Au premier lancement de Metabase, créez le compte administrateur puis ajoutez une base ClickHouse avec :
 
@@ -52,7 +52,13 @@ Résultats produits :
 - `docs/profilage-sources.md` : rapport lisible ;
 - `reports/source-profile.json` : résultat structuré pour les futurs contrôles automatisés.
 
-## Modèle de données Silver
+## Modèles de données
+
+### Bronze
+
+- [Modèle Bronze et cours pédagogique](docs/data-model-bronze.md)
+
+### Silver
 
 - [Documentation et diagramme Mermaid](docs/data-model-silver.md)
 - [Modèle HTML interactif](docs/data-model-silver-interactif.html)

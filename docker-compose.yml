@@ -52,7 +52,14 @@ services:
     volumes:
       - metabase_data:/metabase-data
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:3000/api/health"]
+      test:
+        [
+          "CMD",
+          "curl",
+          "--fail",
+          "--silent",
+          "http://127.0.0.1:3000/api/health",
+        ]
       interval: 10s
       timeout: 5s
       retries: 20

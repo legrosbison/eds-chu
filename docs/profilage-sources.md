@@ -4,53 +4,53 @@ Rapport généré automatiquement par `scripts/profile_sources.py`. Il ne contie
 
 ## Périmètre
 
-| Domaine | Dépôt | Lignes / entrées | Taille (octets) |
-|---|---|---|---|
-| patients | 2026-08-26 | 4 800 | 273456 |
-| patients | 2026-08-27 | 5 400 | 307537 |
-| patients | 2026-08-28 | 6 000 | 341737 |
-| stays | 2026-08-26 | 5 000 | 413300 |
-| stays | 2026-08-27 | 5 000 | 413006 |
-| stays | 2026-08-28 | 5 000 | 413350 |
-| diagnostics | 2026-08-26 | 5 000 | 1004550 |
-| diagnostics | 2026-08-27 | 5 000 | 1009538 |
-| diagnostics | 2026-08-28 | 5 000 | 1008958 |
-| monitoring | 2026-08-26 | 24 631 | 105091 |
-| monitoring | 2026-08-27 | 22 190 | 97754 |
-| monitoring | 2026-08-28 | 19 856 | 101141 |
-| cim10 | 2026-08-26 | 10 | 363 |
-| services | 2026-08-26 | 8 | 171 |
+| Domaine     | Dépôt      | Lignes / entrées | Taille (octets) |
+| ----------- | ---------- | ---------------- | --------------- |
+| patients    | 2026-08-26 | 4 800            | 273456          |
+| patients    | 2026-08-27 | 5 400            | 307537          |
+| patients    | 2026-08-28 | 6 000            | 341737          |
+| stays       | 2026-08-26 | 5 000            | 413300          |
+| stays       | 2026-08-27 | 5 000            | 413006          |
+| stays       | 2026-08-28 | 5 000            | 413350          |
+| diagnostics | 2026-08-26 | 5 000            | 1004550         |
+| diagnostics | 2026-08-27 | 5 000            | 1009538         |
+| diagnostics | 2026-08-28 | 5 000            | 1008958         |
+| monitoring  | 2026-08-26 | 24 631           | 105091          |
+| monitoring  | 2026-08-27 | 22 190           | 97754           |
+| monitoring  | 2026-08-28 | 19 856           | 101141          |
+| cim10       | 2026-08-26 | 10               | 363             |
+| services    | 2026-08-26 | 8                | 171             |
 
 Volume total des fichiers : **5,489,952 octets** pour **14 fichiers**.
 
 ## Résultats principaux
 
-| Domaine | Contrôle | Nombre | Décision |
-|---|---|---|---|
-| Patients | Lignes reçues | 16200 | Information |
-| Patients | Patients distincts | 6000 | Information |
-| Patients | Lignes retirées par déduplication version la plus récente | 10200 | Traitement Silver |
-| Patients | Sexes invalides | 0 | Rejet |
-| Patients | Dates de naissance invalides | 0 | Rejet |
-| Séjours | Lignes reçues | 15000 | Information |
-| Séjours | Séjours en cours | 1190 | Conserver |
-| Séjours | Sortie antérieure à l'admission | 136 | Rejet |
-| Séjours | Séjour terminé sans mode de sortie | 1992 | Rejet |
-| Séjours | Lignes rejetées (règles combinées) | 2111 | Rejet |
-| Séjours | Patients inconnus | 0 | Rejet / investigation |
-| Séjours | Services inconnus | 0 | Rejet / investigation |
-| Diagnostics | Associations aplaties | 37380 | Information |
-| Diagnostics | Codes CIM-10 inconnus | 0 | Rejet / investigation |
-| Diagnostics | Types invalides | 0 | Rejet |
-| Diagnostics | Lignes liées à un séjour Silver rejeté | 5276 | Rejet en cascade |
-| Monitoring | Relevés reçus | 66677 | Information |
-| Monitoring | FC hors 20–250 | 1369 | Rejet |
-| Monitoring | SpO2 hors 50–100 | 1369 | Rejet |
-| Monitoring | Température hors 30–45 | 0 | Rejet |
-| Monitoring | Lignes rejetées par les règles obligatoires | 1369 | Rejet |
-| Monitoring | Relevés hors fenêtre du séjour | 520 | Rejet de cohérence |
-| Monitoring | Lignes liées à un séjour Silver rejeté | 9192 | Rejet en cascade |
-| Monitoring | Lignes rejetées (règles combinées) | 10362 | Rejet |
+| Domaine     | Contrôle                                                  | Nombre | Décision              |
+| ----------- | --------------------------------------------------------- | ------ | --------------------- |
+| Patients    | Lignes reçues                                             | 16200  | Information           |
+| Patients    | Patients distincts                                        | 6000   | Information           |
+| Patients    | Lignes retirées par déduplication version la plus récente | 10200  | Traitement Silver     |
+| Patients    | Sexes invalides                                           | 0      | Rejet                 |
+| Patients    | Dates de naissance invalides                              | 0      | Rejet                 |
+| Séjours     | Lignes reçues                                             | 15000  | Information           |
+| Séjours     | Séjours en cours                                          | 1190   | Conserver             |
+| Séjours     | Sortie antérieure à l'admission                           | 136    | Rejet                 |
+| Séjours     | Séjour terminé sans mode de sortie                        | 1992   | Rejet                 |
+| Séjours     | Lignes rejetées (règles combinées)                        | 2111   | Rejet                 |
+| Séjours     | Patients inconnus                                         | 0      | Rejet / investigation |
+| Séjours     | Services inconnus                                         | 0      | Rejet / investigation |
+| Diagnostics | Associations aplaties                                     | 37380  | Information           |
+| Diagnostics | Codes CIM-10 inconnus                                     | 0      | Rejet / investigation |
+| Diagnostics | Types invalides                                           | 0      | Rejet                 |
+| Diagnostics | Lignes liées à un séjour Silver rejeté                    | 5276   | Rejet en cascade      |
+| Monitoring  | Relevés reçus                                             | 66677  | Information           |
+| Monitoring  | FC hors 20–250                                            | 1369   | Rejet                 |
+| Monitoring  | SpO2 hors 50–100                                          | 1369   | Rejet                 |
+| Monitoring  | Température hors 30–45                                    | 0      | Rejet                 |
+| Monitoring  | Lignes rejetées par les règles obligatoires               | 1369   | Rejet                 |
+| Monitoring  | Relevés hors fenêtre du séjour                            | 520    | Rejet de cohérence    |
+| Monitoring  | Lignes liées à un séjour Silver rejeté                    | 9192   | Rejet en cascade      |
+| Monitoring  | Lignes rejetées (règles combinées)                        | 10362  | Rejet                 |
 
 ## Patients
 

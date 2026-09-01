@@ -84,15 +84,15 @@ erDiagram
 
 ## Dimensions et faits
 
-| Table | Type | Grain / rôle |
-|---|---|---|
-| `dim_patient` | Dimension | Un patient pseudonymisé ; analyse par année de naissance, sexe ou région |
-| `dim_service` | Dimension | Un service hospitalier ; analyse par service |
-| `dim_date` | Dimension | Un jour ; analyse par jour, semaine, mois ou année |
-| `dim_diagnosis` | Dimension | Un code CIM-10 et son libellé ; analyse par pathologie |
-| `fact_stay` | Fait | Une ligne par séjour ; comptage des passages et mesure de durée |
-| `fact_diagnosis` | Fait sans mesure | Une ligne par diagnostic associé à un séjour ; le nombre de lignes ou de patients donne la prévalence |
-| `fact_monitoring` | Fait | Une ligne par relevé horodaté ; mesures de fréquence cardiaque, SpO2 et température |
+| Table             | Type             | Grain / rôle                                                                                          |
+| ----------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
+| `dim_patient`     | Dimension        | Un patient pseudonymisé ; analyse par année de naissance, sexe ou région                              |
+| `dim_service`     | Dimension        | Un service hospitalier ; analyse par service                                                          |
+| `dim_date`        | Dimension        | Un jour ; analyse par jour, semaine, mois ou année                                                    |
+| `dim_diagnosis`   | Dimension        | Un code CIM-10 et son libellé ; analyse par pathologie                                                |
+| `fact_stay`       | Fait             | Une ligne par séjour ; comptage des passages et mesure de durée                                       |
+| `fact_diagnosis`  | Fait sans mesure | Une ligne par diagnostic associé à un séjour ; le nombre de lignes ou de patients donne la prévalence |
+| `fact_monitoring` | Fait             | Une ligne par relevé horodaté ; mesures de fréquence cardiaque, SpO2 et température                   |
 
 `fact_diagnosis` est un **fait sans mesure** : il représente l'événement « un diagnostic est associé à un séjour ». Il est donc comptable même s'il ne contient pas de montant ou de durée.
 
