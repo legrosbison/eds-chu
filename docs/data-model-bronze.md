@@ -127,7 +127,7 @@ Exemple source :
 admission_ts = "date-inconnue"
 ```
 
-Lors du typage Bronze, `parseDateTimeBestEffortOrNull` produit :
+Lors du typage Bronze, `parseDateTime64BestEffortOrNull` produit :
 
 ```text
 admission_ts = NULL

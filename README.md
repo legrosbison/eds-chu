@@ -7,10 +7,15 @@ Projet de construction d'un Entrepôt de Données de Santé suivant une architec
 Prérequis : Docker avec le plugin Compose et Python 3.12 ou supérieur.
 
 ```bash
-cp .env.example .env
+python3 scripts/init_env.py
 docker compose up -d
 docker compose ps
+python3 scripts/run_pipeline.py
 ```
+
+`init_env.py` crée un fichier `.env` local avec une clé de pseudonymisation
+aléatoire. Ce fichier est ignoré par Git et reçoit les permissions `0600`.
+Conservez cette clé : la changer casserait la stabilité des pseudonymes.
 
 Services disponibles :
 
@@ -72,14 +77,41 @@ Le modèle est une constellation constituée de :
 
 Les données sources et les PDF du cours ne sont volontairement pas publiés dans ce dépôt.
 
+## Pipeline Lake → Bronze → Silver
+
+Le pipeline complet se lance avec une seule commande :
+
+```bash
+python3 scripts/run_pipeline.py
+```
+
+Il réalise successivement :
+
+1. la détection incrémentale des fichiers et leur copie versionnée dans le Lake ;
+2. la pseudonymisation HMAC-SHA256 des patients avant leur entrée dans le Lake ;
+3. le chargement typé et traçable des tables Bronze ;
+4. les contrôles, rejets et transformations SQL vers les dimensions et faits Silver.
+
+Un deuxième lancement ne recharge pas les fichiers déjà réussis. Pour exécuter
+une partie seulement :
+
+```bash
+python3 scripts/ingest_lake.py --dry-run
+python3 scripts/run_pipeline.py --skip-lake
+python3 scripts/run_pipeline.py --skip-bronze
+```
+
+Le fonctionnement, les règles de reprise et les volumes contrôlés sont détaillés
+dans [la documentation du pipeline](docs/pipeline-lake-bronze-silver.md).
+
 ## État du projet
 
 - [x] Analyse du sujet
 - [x] Modèle Silver et relations
 - [x] Exploration et profilage des sources
 - [x] Environnement Docker avec ClickHouse et Metabase
-- [ ] Ingestion incrémentale et pseudonymisation
-- [ ] Tables Bronze puis transformations SQL Silver
+- [x] Ingestion incrémentale et pseudonymisation
+- [x] Tables Bronze puis transformations SQL Silver
 - [ ] Tables Gold et KPI
 - [ ] Dashboards pilotage et recherche
 - [ ] Orchestration, journalisation et documentation d'exploitation
