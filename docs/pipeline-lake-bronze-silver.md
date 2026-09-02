@@ -51,7 +51,7 @@ déjà le statut `SUCCESS` et que la copie est encore intacte, le fichier est
 ignoré. Sinon, une nouvelle version est créée avec un nom comme :
 
 ```text
-patients/2026-08-26/patients__a07805261f5d.csv
+patients/2026-08-26/patients__b8cb88164193.csv
 ```
 
 Le suffixe vient de l'empreinte du fichier. Une correction d'un fichier existant
@@ -68,11 +68,11 @@ LAKE discovered=14 copied=0 skipped=14 failed=0
 
 Les fichiers patient et séjour sont réécrits avant leur dépôt dans le Lake.
 
-| Source sensible | Valeur placée dans le Lake |
-| --- | --- |
-| `patient_id` | `patient_key = HMAC-SHA256(clé, patient_id)` |
-| `birth_date` | année seule dans `birth_year` |
-| `nom`, `prenom`, `nir` | colonnes supprimées |
+| Source sensible        | Valeur placée dans le Lake                   |
+| ---------------------- | -------------------------------------------- |
+| `patient_id`           | `patient_key = HMAC-SHA256(clé, patient_id)` |
+| `birth_date`           | année seule dans `birth_year`                |
+| `nom`, `prenom`, `nir` | colonnes supprimées                          |
 
 Exemple fictif :
 
@@ -136,16 +136,16 @@ son fichier et son numéro de ligne. Elle reste également en Bronze.
 
 ## 6. Volumes vérifiés
 
-Le pipeline a été exécuté sur les 14 fichiers du sujet :
+Le pipeline a été exécuté sur les 89 fichiers du jeu corrigé :
 
-| Jeu de données | Bronze | Silver accepté | Rejeté |
-| --- | ---: | ---: | ---: |
-| Patients | 16 200 versions | 6 000 patients courants | 0 |
-| Séjours | 15 000 | 12 889 | 2 111 |
-| Diagnostics | 37 380 diagnostics imbriqués | 32 104 | 5 276 |
-| Monitoring | 66 677 | 56 315 | 10 362 |
-| Services | 8 | 8 | 0 |
-| CIM-10 | 10 | 10 | 0 |
+| Jeu de données |                       Bronze |          Silver accepté | Rejeté |
+| -------------- | ---------------------------: | ----------------------: | -----: |
+| Patients       |              18 000 versions | 6 000 patients courants |      0 |
+| Séjours        |                        6 797 |                   6 729 |     68 |
+| Diagnostics    | 12 720 diagnostics imbriqués |                  12 593 |    127 |
+| Monitoring     |                       41 778 |                  40 400 |  1 378 |
+| Services       |                            8 |                       8 |      0 |
+| CIM-10         |                           13 |                      13 |      0 |
 
 Pour les patients, Bronze contient les trois photographies quotidiennes. La
 table `silver.dim_patient` utilise `ReplacingMergeTree` et conserve la version la

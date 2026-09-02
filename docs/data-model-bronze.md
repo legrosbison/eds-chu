@@ -239,7 +239,7 @@ Exemple :
 patients/2026-08-26/patients.csv + abc123 + SUCCESS
 ```
 
-Un second lancement voit la même empreinte et ne recharge pas les 4 800 lignes. Le pipeline devient rejouable sans créer de doublons techniques.
+Un second lancement voit la même empreinte et ne recharge pas les 6 000 lignes. Le pipeline devient rejouable sans créer de doublons techniques.
 
 ## 10. De Bronze vers Silver
 

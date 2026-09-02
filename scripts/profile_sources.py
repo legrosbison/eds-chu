@@ -545,7 +545,9 @@ def build_markdown(profile: dict[str, Any]) -> str:
                 [domain, item["date"], f"{row_count:,}".replace(",", " "), item["bytes"]]
             )
     for domain, item in profile["references"].items():
-        inventory_rows.append([domain, "2026-08-26", item["rows"], item["bytes"]])
+        inventory_rows.append(
+            [domain, deposit_date(Path(item["file"])), item["rows"], item["bytes"]]
+        )
 
     quality_rows = [
         ["Patients", "Lignes reçues", patients["rows"], "Information"],
@@ -643,7 +645,7 @@ Les bornes fournies par le sujet sont des bornes de **validité**, pas des seuil
 
 1. Charger d'abord les référentiels et patients, puis les séjours, diagnostics et relevés afin de contrôler l'intégrité des clés.
 2. Pseudonymiser avant l'entrée dans l'entrepôt et ne jamais tracer de donnée identifiante dans les rejets.
-3. Écrire les lignes invalides dans `audit_quality_rejects` avec la règle, le lot et le fichier source.
+3. Écrire les lignes invalides dans `audit.quality_rejects` avec la règle, le lot et le fichier source.
 4. Partitionner `fact_monitoring` par mois de `measurement_date_key` ; ne pas créer une partition par jour.
 5. Effectuer Bronze → Silver → Gold en SQL dans ClickHouse. Le script de profilage sert uniquement à l'exploration initiale.
 """

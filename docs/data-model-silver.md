@@ -110,6 +110,6 @@ erDiagram
 - Une sortie antérieure à l'admission est rejetée ; une sortie vide est conservée avec `is_ongoing = true`.
 - Les diagnostics JSON sont aplatis avant leur chargement dans `fact_diagnosis`.
 - Les relevés hors bornes sont rejetés : fréquence cardiaque 20–250, SpO2 50–100 %, température 30–45 °C.
-- Chaque table reçoit `batch_id`, `source_file`, `source_date` et `processed_at`. Les rejets sont enregistrés dans une table technique `audit_quality_rejects`, séparée du modèle analytique et sans donnée identifiante.
+- Les tables conservent les colonnes de traçabilité utiles. Les rejets sont enregistrés dans la table technique `audit.quality_rejects`, séparée du modèle analytique et sans donnée identifiante.
 
 Les agrégats comme la DMS, les réadmissions, les passages aux urgences et les cohortes restent en Gold. Le sujet ne fournit pas les seuils médicaux d'alerte du monitoring : ils doivent être validés par le métier avant de calculer cet indicateur.

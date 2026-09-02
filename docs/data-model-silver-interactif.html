@@ -678,7 +678,7 @@
         <p>Conformément au médaillon du cours, Silver contient les données détaillées nettoyées, dédupliquées, cohérentes et enrichies. Les KPI déjà agrégés restent en Gold.</p>
         <div class="rule-card"><strong>Choix volontairement simple</strong><p>Pas de dim_mode ni de dim_stay : les modes restent des attributs du séjour et stay_id est une dimension dégénérée.</p></div>
         <h3>Traçabilité</h3>
-        <p><code>batch_id</code>, <code>source_file</code>, <code>source_date</code> et <code>processed_at</code> sont présents dans chaque table. Les rejets vont dans <code>audit_quality_rejects</code>, hors du modèle analytique.</p>
+        <p>Les tables conservent les colonnes de traçabilité utiles. Les rejets vont dans <code>audit.quality_rejects</code>, hors du modèle analytique.</p>
       `;
     }
 
