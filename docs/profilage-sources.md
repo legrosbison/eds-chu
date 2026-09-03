@@ -100,32 +100,33 @@ Volume total des fichiers : **3,176,844 octets** pour **89 fichiers**.
 
 ## Résultats principaux
 
-| Domaine     | Contrôle                                                  | Nombre | Décision              |
-| ----------- | --------------------------------------------------------- | ------ | --------------------- |
-| Patients    | Lignes reçues                                             | 18000  | Information           |
-| Patients    | Patients distincts                                        | 6000   | Information           |
-| Patients    | Lignes retirées par déduplication version la plus récente | 12000  | Traitement Silver     |
-| Patients    | Sexes invalides                                           | 0      | Rejet                 |
-| Patients    | Dates de naissance invalides                              | 0      | Rejet                 |
-| Séjours     | Lignes reçues                                             | 6797   | Information           |
-| Séjours     | Séjours en cours                                          | 683    | Conserver             |
-| Séjours     | Sortie antérieure à l'admission                           | 68     | Rejet                 |
-| Séjours     | Séjour terminé sans mode de sortie                        | 0      | Rejet                 |
-| Séjours     | Lignes rejetées (règles combinées)                        | 68     | Rejet                 |
-| Séjours     | Patients inconnus                                         | 0      | Rejet / investigation |
-| Séjours     | Services inconnus                                         | 0      | Rejet / investigation |
-| Diagnostics | Associations aplaties                                     | 12720  | Information           |
-| Diagnostics | Codes CIM-10 inconnus                                     | 0      | Rejet / investigation |
-| Diagnostics | Types invalides                                           | 0      | Rejet                 |
-| Diagnostics | Lignes liées à un séjour Silver rejeté                    | 127    | Rejet en cascade      |
-| Monitoring  | Relevés reçus                                             | 41778  | Information           |
-| Monitoring  | FC hors 20–250                                            | 858    | Rejet                 |
-| Monitoring  | SpO2 hors 50–100                                          | 858    | Rejet                 |
-| Monitoring  | Température hors 30–45                                    | 0      | Rejet                 |
-| Monitoring  | Lignes rejetées par les règles obligatoires               | 858    | Rejet                 |
-| Monitoring  | Relevés hors fenêtre du séjour                            | 528    | Rejet de cohérence    |
-| Monitoring  | Lignes liées à un séjour Silver rejeté                    | 528    | Rejet en cascade      |
-| Monitoring  | Lignes rejetées (règles combinées)                        | 1378   | Rejet                 |
+| Domaine     | Contrôle                                                  | Nombre | Décision                    |
+| ----------- | --------------------------------------------------------- | ------ | --------------------------- |
+| Patients    | Lignes reçues                                             | 18000  | Information                 |
+| Patients    | Patients distincts                                        | 6000   | Information                 |
+| Patients    | Lignes retirées par déduplication version la plus récente | 12000  | Traitement Silver           |
+| Patients    | Sexes invalides                                           | 0      | Rejet                       |
+| Patients    | Dates de naissance invalides                              | 0      | Rejet                       |
+| Séjours     | Lignes reçues                                             | 6797   | Information                 |
+| Séjours     | Séjours en cours                                          | 683    | Conserver                   |
+| Séjours     | Sortie antérieure à l'admission                           | 68     | Rejet                       |
+| Séjours     | Séjour terminé sans mode de sortie                        | 0      | Rejet                       |
+| Séjours     | Lignes rejetées (règles combinées)                        | 68     | Rejet                       |
+| Séjours     | Patients inconnus                                         | 0      | Rejet / investigation       |
+| Séjours     | Services inconnus                                         | 0      | Rejet / investigation       |
+| Diagnostics | Associations aplaties                                     | 12720  | Information                 |
+| Diagnostics | Codes CIM-10 inconnus                                     | 0      | Rejet / investigation       |
+| Diagnostics | Types invalides                                           | 0      | Rejet                       |
+| Diagnostics | Liés à un séjour de durée invalide                        | 127    | Conserver                   |
+| Diagnostics | Lignes acceptées en Silver                                | 12720  | Conserver                   |
+| Monitoring  | Relevés reçus                                             | 41778  | Information                 |
+| Monitoring  | FC hors 20–250                                            | 858    | Rejet                       |
+| Monitoring  | SpO2 hors 50–100                                          | 858    | Rejet                       |
+| Monitoring  | Température hors 30–45                                    | 0      | Rejet                       |
+| Monitoring  | Lignes rejetées par les règles obligatoires               | 858    | Rejet                       |
+| Monitoring  | Relevés hors fenêtre du séjour                            | 528    | Observation                 |
+| Monitoring  | Liés à un séjour de durée invalide                        | 528    | Conserver si capteur valide |
+| Monitoring  | Lignes rejetées en Silver                                 | 858    | Rejet                       |
 
 ## Patients
 
@@ -154,7 +155,7 @@ Décision Silver : pseudonymiser `patient_id`, supprimer nom/prénom/NIR, géné
 - Nombre de diagnostics par séjour : min **1**, médiane **2**, moyenne **1.87**, max **3**.
 - Codes CIM-10 inconnus : **0** ; séjours inconnus : **0**.
 - Doublons sur `(stay_id, code_cim10, type)` : **0**.
-- **127 diagnostics** sont rejetés en cascade car leur séjour parent est invalide ; **12,593 lignes** restent acceptées.
+- **127 diagnostics** appartiennent à un séjour dont la durée est invalide. Ils restent conservés : l'anomalie de durée n'annule pas le diagnostic. Au total, **12,720 lignes** sont acceptées.
 
 ## Monitoring
 
@@ -164,9 +165,9 @@ Décision Silver : pseudonymiser `patient_id`, supprimer nom/prénom/NIR, géné
 - Température : min **36.4**, max **40.0**, hors plage **0**.
 - Doublons sur `(stay_id, ts)` : **0**.
 - Intégrité : **0 séjours inconnus**, **0 relevés avant admission**, **528 après sortie**.
-- **528 relevés** dépendent d'un séjour Silver rejeté. Après combinaison des règles physiologiques, temporelles et parentales, **40,400 relevés sont acceptés** et **1,378 rejetés**.
+- Les incohérences avec les dates du séjour sont gardées comme observations de qualité, sans rejet en cascade. **40,920 relevés sont acceptés** et **858 relevés capteur sont rejetés**.
 
-Les bornes fournies par le sujet sont des bornes de **validité**, pas des seuils d'alerte clinique. Les seuils d'alerte devront être validés par le métier avant leur calcul en Gold.
+Les bornes Silver sont des bornes de **validité**. Elles sont différentes des seuils d'alerte du corrigé Gold : SpO2 < 92, fréquence cardiaque < 50 ou > 100, température > 38,5 °C.
 
 ## Conséquences pour l'implémentation
 

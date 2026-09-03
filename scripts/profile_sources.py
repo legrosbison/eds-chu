@@ -351,7 +351,6 @@ def profile_diagnostics(
                 stay = stays_by_id.get(stay_id)
                 if stay and not stay["silver_accepted"]:
                     file_counts["rows_on_rejected_silver_stay"] += 1
-                    row_invalid = True
                 if not code:
                     file_counts["missing_diagnosis_code"] += 1
                     row_invalid = True
@@ -468,7 +467,6 @@ def profile_monitoring(
                 else:
                     if not stay["silver_accepted"]:
                         file_counts["rows_on_rejected_silver_stay"] += 1
-                        parent_invalid = True
                     if timestamp:
                         if stay["admission_ts"] and timestamp < stay["admission_ts"]:
                             file_counts["timestamp_before_admission"] += 1
@@ -481,7 +479,10 @@ def profile_monitoring(
                     file_counts["rows_rejected_by_required_quality_rules"] += 1
                 if temporal_invalid:
                     file_counts["rows_rejected_by_stay_window_rule"] += 1
-                if required_invalid or temporal_invalid or parent_invalid:
+                # Les incohérences temporelles sont signalées pour l'analyse,
+                # mais le corrigé n'écarte en Silver que les mesures capteur
+                # aberrantes (et, par sécurité, un séjour réellement inconnu).
+                if required_invalid or parent_invalid:
                     file_counts["rows_rejected_by_all_silver_rules"] += 1
                 else:
                     file_counts["rows_accepted_silver"] += 1
@@ -570,7 +571,8 @@ def build_markdown(profile: dict[str, Any]) -> str:
         ["Diagnostics", "Associations aplaties", diagnostics["diagnosis_rows"], "Information"],
         ["Diagnostics", "Codes CIM-10 inconnus", value(diagnostics, "unknown_diagnosis_codes"), "Rejet / investigation"],
         ["Diagnostics", "Types invalides", value(diagnostics, "invalid_diagnosis_type"), "Rejet"],
-        ["Diagnostics", "Lignes liées à un séjour Silver rejeté", value(diagnostics, "rows_on_rejected_silver_stay"), "Rejet en cascade"],
+        ["Diagnostics", "Liés à un séjour de durée invalide", value(diagnostics, "rows_on_rejected_silver_stay"), "Conserver"],
+        ["Diagnostics", "Lignes acceptées en Silver", value(diagnostics, "rows_accepted_silver"), "Conserver"],
         ["Monitoring", "Relevés reçus", monitoring["rows"], "Information"],
         ["Monitoring", "FC hors 20–250", value(monitoring, "heart_rate_out_of_range"), "Rejet"],
         ["Monitoring", "SpO2 hors 50–100", value(monitoring, "spo2_out_of_range"), "Rejet"],
@@ -581,9 +583,9 @@ def build_markdown(profile: dict[str, Any]) -> str:
             value(monitoring, "rows_rejected_by_required_quality_rules"),
             "Rejet",
         ],
-        ["Monitoring", "Relevés hors fenêtre du séjour", value(monitoring, "rows_rejected_by_stay_window_rule"), "Rejet de cohérence"],
-        ["Monitoring", "Lignes liées à un séjour Silver rejeté", value(monitoring, "rows_on_rejected_silver_stay"), "Rejet en cascade"],
-        ["Monitoring", "Lignes rejetées (règles combinées)", value(monitoring, "rows_rejected_by_all_silver_rules"), "Rejet"],
+        ["Monitoring", "Relevés hors fenêtre du séjour", value(monitoring, "rows_rejected_by_stay_window_rule"), "Observation"],
+        ["Monitoring", "Liés à un séjour de durée invalide", value(monitoring, "rows_on_rejected_silver_stay"), "Conserver si capteur valide"],
+        ["Monitoring", "Lignes rejetées en Silver", value(monitoring, "rows_rejected_by_all_silver_rules"), "Rejet"],
     ]
 
     return f"""# Profilage des fichiers sources
@@ -627,7 +629,7 @@ Décision Silver : pseudonymiser `patient_id`, supprimer nom/prénom/NIR, géné
 - Nombre de diagnostics par séjour : min **{diagnostics['diagnoses_per_stay']['min']}**, médiane **{diagnostics['diagnoses_per_stay']['median']}**, moyenne **{diagnostics['diagnoses_per_stay']['mean']}**, max **{diagnostics['diagnoses_per_stay']['max']}**.
 - Codes CIM-10 inconnus : **{value(diagnostics, 'unknown_diagnosis_codes')}** ; séjours inconnus : **{value(diagnostics, 'unknown_stay_ids')}**.
 - Doublons sur `(stay_id, code_cim10, type)` : **{value(diagnostics, 'duplicate_diagnoses_across_all_files')}**.
-- **{value(diagnostics, 'rows_on_rejected_silver_stay'):,} diagnostics** sont rejetés en cascade car leur séjour parent est invalide ; **{value(diagnostics, 'rows_accepted_silver'):,} lignes** restent acceptées.
+- **{value(diagnostics, 'rows_on_rejected_silver_stay'):,} diagnostics** appartiennent à un séjour dont la durée est invalide. Ils restent conservés : l'anomalie de durée n'annule pas le diagnostic. Au total, **{value(diagnostics, 'rows_accepted_silver'):,} lignes** sont acceptées.
 
 ## Monitoring
 
@@ -637,9 +639,9 @@ Décision Silver : pseudonymiser `patient_id`, supprimer nom/prénom/NIR, géné
 - Température : min **{monitoring['temp_c']['min']}**, max **{monitoring['temp_c']['max']}**, hors plage **{value(monitoring, 'temp_c_out_of_range')}**.
 - Doublons sur `(stay_id, ts)` : **{value(monitoring, 'duplicate_stay_timestamp_across_all_files')}**.
 - Intégrité : **{value(monitoring, 'unknown_stay_ids')} séjours inconnus**, **{value(monitoring, 'timestamp_before_admission')} relevés avant admission**, **{value(monitoring, 'timestamp_after_discharge')} après sortie**.
-- **{value(monitoring, 'rows_on_rejected_silver_stay'):,} relevés** dépendent d'un séjour Silver rejeté. Après combinaison des règles physiologiques, temporelles et parentales, **{value(monitoring, 'rows_accepted_silver'):,} relevés sont acceptés** et **{value(monitoring, 'rows_rejected_by_all_silver_rules'):,} rejetés**.
+- Les incohérences avec les dates du séjour sont gardées comme observations de qualité, sans rejet en cascade. **{value(monitoring, 'rows_accepted_silver'):,} relevés sont acceptés** et **{value(monitoring, 'rows_rejected_by_all_silver_rules'):,} relevés capteur sont rejetés**.
 
-Les bornes fournies par le sujet sont des bornes de **validité**, pas des seuils d'alerte clinique. Les seuils d'alerte devront être validés par le métier avant leur calcul en Gold.
+Les bornes Silver sont des bornes de **validité**. Elles sont différentes des seuils d'alerte du corrigé Gold : SpO2 < 92, fréquence cardiaque < 50 ou > 100, température > 38,5 °C.
 
 ## Conséquences pour l'implémentation
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run Lake ingestion, Bronze loading, and incremental Silver SQL transforms."""
+"""Run the Lake, Bronze, Silver, and Gold data pipeline."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ import sys
 import urllib.error
 import urllib.parse
 import urllib.request
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -76,6 +77,15 @@ SILVER_CONFIG: dict[str, dict[str, Any]] = {
     },
 }
 
+GOLD_TABLES = (
+    "gold.kpi_dms_service",
+    "gold.kpi_readmission_30d",
+    "gold.kpi_emergency_daily",
+    "gold.kpi_monitoring_alert_daily",
+    "gold.kpi_pathology_prevalence",
+    "gold.kpi_cohort_demographics",
+)
+
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
@@ -84,7 +94,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--env-file", type=Path, default=ROOT / ".env")
     parser.add_argument(
         "--step",
-        choices=("all", "lake", "bronze", "silver"),
+        choices=("all", "lake", "bronze", "silver", "gold"),
         default="all",
         help="Étape à lancer (par défaut : tout le pipeline)",
     )
@@ -155,8 +165,32 @@ def bootstrap(client: ClickHouseClient) -> None:
         "sql/00_audit_tables.sql",
         "sql/10_bronze_tables.sql",
         "sql/20_silver_tables.sql",
+        "sql/40_gold_tables.sql",
     ):
         client.execute_file(ROOT / relative)
+
+
+def record_pipeline_status(
+    client: ClickHouseClient,
+    run_id: str,
+    step: str,
+    status: str,
+    message: str = "",
+) -> None:
+    """Ajouter un événement au journal global du pipeline."""
+    client.execute(
+        """
+        INSERT INTO audit.pipeline_runs
+        SELECT {run_id:UUID}, {step:String}, {status:String},
+               {message:String}, now64(3, 'UTC')
+        """,
+        params={
+            "run_id": run_id,
+            "step": step,
+            "status": status,
+            "message": " ".join(message.split())[:1000],
+        },
+    )
 
 
 def successful_manifest_entries(lake: Path) -> list[dict[str, Any]]:
@@ -461,27 +495,49 @@ def transform_silver(
 
 
 # ---------------------------------------------------------------------------
-# Pipeline principal : Lake, puis Bronze, puis Silver
+# Étape Gold : agrégats métier prêts pour Metabase
+# ---------------------------------------------------------------------------
+
+def build_gold(client: ClickHouseClient) -> None:
+    """Reconstruire les petites tables KPI à partir des données Silver."""
+    client.execute_file(ROOT / "sql/gold/40_build_gold.sql")
+    for table in GOLD_TABLES:
+        row_count = client.scalar(f"SELECT count() FROM {table}")
+        print(f"GOLD_BUILT {table} rows={row_count}")
+
+
+# ---------------------------------------------------------------------------
+# Pipeline principal : Lake, puis Bronze, Silver et Gold
 # ---------------------------------------------------------------------------
 
 def main() -> None:
     args = parse_args()
     load_env_file(args.env_file)
-
-    if args.step in {"all", "lake"}:
-        secret = pseudonymization_secret(args.env_file)
-        summary = ingest(args.source, args.lake, secret)
-        print("LAKE " + " ".join(f"{key}={value}" for key, value in summary.items()))
-    if args.step == "lake":
-        return
-
     client = clickhouse_client(args.env_file)
     bootstrap(client)
-    entries = successful_manifest_entries(args.lake)
-    if args.step in {"all", "bronze"}:
-        load_bronze(client, args.lake, entries)
-    if args.step in {"all", "silver"}:
-        transform_silver(client, entries)
+    run_id = str(uuid.uuid4())
+    record_pipeline_status(client, run_id, args.step, "RUNNING")
+    print(f"PIPELINE_RUN run_id={run_id} step={args.step}")
+
+    try:
+        if args.step in {"all", "lake"}:
+            secret = pseudonymization_secret(args.env_file)
+            summary = ingest(args.source, args.lake, secret)
+            print("LAKE " + " ".join(f"{key}={value}" for key, value in summary.items()))
+        if args.step in {"all", "bronze"}:
+            entries = successful_manifest_entries(args.lake)
+            load_bronze(client, args.lake, entries)
+        if args.step in {"all", "silver"}:
+            entries = successful_manifest_entries(args.lake)
+            transform_silver(client, entries)
+        if args.step in {"all", "gold"}:
+            build_gold(client)
+    except Exception as error:
+        record_pipeline_status(client, run_id, args.step, "FAILED", str(error))
+        raise
+    else:
+        record_pipeline_status(client, run_id, args.step, "SUCCESS")
+        print(f"PIPELINE_SUCCESS run_id={run_id} step={args.step}")
 
 
 if __name__ == "__main__":

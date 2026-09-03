@@ -91,10 +91,30 @@ erDiagram
 | `dim_date`        | Dimension        | Un jour ; analyse par jour, semaine, mois ou année                                                    |
 | `dim_diagnosis`   | Dimension        | Un code CIM-10 et son libellé ; analyse par pathologie                                                |
 | `fact_stay`       | Fait             | Une ligne par séjour ; comptage des passages et mesure de durée                                       |
-| `fact_diagnosis`  | Fait sans mesure | Une ligne par diagnostic associé à un séjour ; le nombre de lignes ou de patients donne la prévalence |
+| `fact_diagnosis`  | Fait sans mesure | Une ligne par diagnostic associé à un séjour ; les patients distincts donnent la taille de la cohorte |
 | `fact_monitoring` | Fait             | Une ligne par relevé horodaté ; mesures de fréquence cardiaque, SpO2 et température                   |
 
 `fact_diagnosis` est un **fait sans mesure** : il représente l'événement « un diagnostic est associé à un séjour ». Il est donc comptable même s'il ne contient pas de montant ou de durée.
+
+### Correspondance des propriétés diagnostic
+
+Les noms évoluent légèrement entre les couches, de façon explicite :
+
+| Source JSON  | Bronze                       | Silver           | Rôle                  |
+| ------------ | ---------------------------- | ---------------- | --------------------- |
+| `code_cim10` | `diagnostics.code_cim10`     | `diagnosis_code` | code de la pathologie |
+| `type`       | `diagnostics.diagnosis_type` | `diagnosis_type` | principal ou associé  |
+
+Le SQL lit maintenant les propriétés nommées
+`diagnostic.code_cim10` et `diagnostic.diagnosis_type`, puis les renomme selon le
+vocabulaire Silver. Il n'existe pas de table `silver.stays` : la table de faits
+des séjours valides s'appelle `silver.fact_stay`.
+
+Pour enrichir un diagnostic avec son patient, son service et sa date
+d'admission, le traitement relit toutefois le contexte du séjour en Bronze. Ce
+choix est important : une sortie antérieure à l'admission invalide la **durée du
+séjour**, mais n'annule pas un diagnostic ou un relevé capteur valide. Cela évite
+de supprimer 127 diagnostics et 520 relevés supplémentaires par cascade.
 
 ## Relations déduites
 
@@ -110,6 +130,7 @@ erDiagram
 - Une sortie antérieure à l'admission est rejetée ; une sortie vide est conservée avec `is_ongoing = true`.
 - Les diagnostics JSON sont aplatis avant leur chargement dans `fact_diagnosis`.
 - Les relevés hors bornes sont rejetés : fréquence cardiaque 20–250, SpO2 50–100 %, température 30–45 °C.
+- Chaque fait applique ses propres règles : une anomalie de durée dans `fact_stay` n'invalide pas automatiquement un diagnostic ou un relevé.
 - Les tables conservent les colonnes de traçabilité utiles. Les rejets sont enregistrés dans la table technique `audit.quality_rejects`, séparée du modèle analytique et sans donnée identifiante.
 
-Les agrégats comme la DMS, les réadmissions, les passages aux urgences et les cohortes restent en Gold. Le sujet ne fournit pas les seuils médicaux d'alerte du monitoring : ils doivent être validés par le métier avant de calculer cet indicateur.
+Les agrégats comme la DMS, les réadmissions, les passages aux urgences et les cohortes restent en Gold. Les seuils d'alerte utilisés pour l'exercice sont ceux du corrigé : SpO2 < 92, fréquence cardiaque < 50 ou > 100 et température > 38,5 °C.

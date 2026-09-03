@@ -8,9 +8,8 @@ Prérequis : Docker avec le plugin Compose et Python 3.12 ou supérieur.
 
 ```bash
 python3 scripts/init_env.py
-docker compose up -d
-docker compose ps
-python3 scripts/run_pipeline.py
+docker compose up -d --build
+docker compose ps --all
 ```
 
 `init_env.py` crée un fichier `.env` local avec une clé de pseudonymisation
@@ -19,18 +18,19 @@ Conservez cette clé : la changer casserait la stabilité des pseudonymes.
 
 Services disponibles :
 
-| Service          | Adresse                      | Usage                 |
-| ---------------- | ---------------------------- | --------------------- |
-| ClickHouse HTTP  | <http://localhost:8123/play> | Console SQL           |
-| ClickHouse natif | `localhost:9000`             | Connexion des clients |
-| Metabase         | <http://localhost:3000>      | Dashboards            |
+| Service          | Adresse                      | Usage                      |
+| ---------------- | ---------------------------- | -------------------------- |
+| ClickHouse HTTP  | <http://localhost:8123/play> | Console SQL                |
+| ClickHouse natif | `localhost:9000`             | Connexion des clients      |
+| Metabase         | <http://localhost:3000>      | Dashboards                 |
+| Scheduler        | conteneur Docker             | Pipeline quotidien à 02:00 |
 
-Au premier lancement de Metabase, créez le compte administrateur puis ajoutez une base ClickHouse avec :
+Au premier lancement :
 
-- hôte : `clickhouse` ;
-- port : `8123` ;
-- base par défaut : `gold` ;
-- utilisateur et mot de passe : valeurs de `.env`.
+- le scheduler exécute immédiatement le pipeline puis le planifie chaque jour ;
+- `metabase-setup` configure la connexion ClickHouse, les deux dashboards et
+  les comptes de démonstration ;
+- les identifiants locaux sont conservés dans `.env` et ne sont jamais publiés.
 
 Le Compose initialise automatiquement les bases `bronze`, `silver`, `gold` et `audit`. Les volumes Docker conservent les données entre deux redémarrages.
 
@@ -75,9 +75,34 @@ Le modèle est une constellation constituée de :
 - quatre dimensions : patient, service, date et diagnostic ;
 - trois faits : séjour, diagnostic associé à un séjour et relevé de monitoring.
 
+### Gold
+
+- [Modèle Gold, formules et explication des KPI](docs/data-model-gold.md)
+
+Gold contient six tables directement exploitables dans Metabase : DMS,
+activité des urgences, réadmission à 30 jours, alertes de monitoring, prévalence
+des pathologies et démographie des cohortes.
+
+## Dashboards et exploitation
+
+- [Description des dashboards et démonstration des droits](docs/dashboards-metabase.md)
+- [Guide d'exploitation, journaux et reprise sur incident](docs/exploitation.md)
+
+Les dashboards peuvent être reprovisionnés sans doublons :
+
+```bash
+python3 scripts/setup_metabase.py
+```
+
+Pour suivre le traitement quotidien :
+
+```bash
+docker compose logs -f scheduler
+```
+
 Les données sources et les PDF du cours ne sont volontairement pas publiés dans ce dépôt.
 
-## Pipeline Lake → Bronze → Silver
+## Pipeline Lake → Bronze → Silver → Gold
 
 Le pipeline complet se lance avec une seule commande :
 
@@ -90,7 +115,8 @@ Il réalise successivement :
 1. la détection incrémentale des fichiers et leur copie versionnée dans le Lake ;
 2. la pseudonymisation HMAC-SHA256 des patients avant leur entrée dans le Lake ;
 3. le chargement typé et traçable des tables Bronze ;
-4. les contrôles, rejets et transformations SQL vers les dimensions et faits Silver.
+4. les contrôles, rejets et transformations SQL vers les dimensions et faits Silver ;
+5. le calcul des tables Gold et des KPI prêts pour Metabase.
 
 Un deuxième lancement ne recharge pas les fichiers déjà réussis. Pour exécuter
 une partie seulement :
@@ -100,6 +126,7 @@ python3 scripts/ingest_lake.py --dry-run
 python3 scripts/run_pipeline.py --step lake
 python3 scripts/run_pipeline.py --step bronze
 python3 scripts/run_pipeline.py --step silver
+python3 scripts/run_pipeline.py --step gold
 ```
 
 Pour débuter, retenez seulement `python3 scripts/run_pipeline.py` : les options
@@ -116,6 +143,6 @@ dans [la documentation du pipeline](docs/pipeline-lake-bronze-silver.md).
 - [x] Environnement Docker avec ClickHouse et Metabase
 - [x] Ingestion incrémentale et pseudonymisation
 - [x] Tables Bronze puis transformations SQL Silver
-- [ ] Tables Gold et KPI
-- [ ] Dashboards pilotage et recherche
-- [ ] Orchestration, journalisation et documentation d'exploitation
+- [x] Tables Gold et KPI
+- [x] Dashboards pilotage et recherche
+- [x] Orchestration, journalisation et documentation d'exploitation

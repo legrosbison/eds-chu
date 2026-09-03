@@ -11,30 +11,48 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 EXAMPLE = ROOT / ".env.example"
 TARGET = ROOT / ".env"
-PLACEHOLDER = "replace-with-a-long-random-secret"
+SECRET_PLACEHOLDERS = {
+    "PSEUDONYMIZATION_KEY": "replace-with-a-long-random-secret",
+    "METABASE_ADMIN_PASSWORD": "replace-with-a-strong-local-password",
+    "METABASE_PILOTAGE_PASSWORD": "replace-with-a-strong-local-password",
+    "METABASE_RECHERCHE_PASSWORD": "replace-with-a-strong-local-password",
+}
 
 
 def main() -> None:
+    example_content = EXAMPLE.read_text(encoding="utf-8") if EXAMPLE.exists() else ""
     if TARGET.exists():
         content = TARGET.read_text(encoding="utf-8")
-    elif EXAMPLE.exists():
-        content = EXAMPLE.read_text(encoding="utf-8")
+        existing_names = {
+            line.split("=", 1)[0]
+            for line in content.splitlines()
+            if "=" in line and not line.lstrip().startswith("#")
+        }
+        missing_lines = [
+            line
+            for line in example_content.splitlines()
+            if "=" in line
+            and not line.lstrip().startswith("#")
+            and line.split("=", 1)[0] not in existing_names
+        ]
+        if missing_lines:
+            content = content.rstrip() + "\n" + "\n".join(missing_lines) + "\n"
     else:
-        content = ""
+        content = example_content
 
-    generated = secrets.token_urlsafe(48)
     lines = content.splitlines()
-    found = False
     output: list[str] = []
     for line in lines:
-        if line.startswith("PSEUDONYMIZATION_KEY="):
-            found = True
-            current = line.split("=", 1)[1]
-            if len(current) < 32 or current == PLACEHOLDER:
-                line = f"PSEUDONYMIZATION_KEY={generated}"
+        name, separator, current = line.partition("=")
+        if separator and name in SECRET_PLACEHOLDERS:
+            if len(current) < 16 or current == SECRET_PLACEHOLDERS[name]:
+                line = f"{name}={secrets.token_urlsafe(24)}"
         output.append(line)
-    if not found:
-        output.append(f"PSEUDONYMIZATION_KEY={generated}")
+
+    present_names = {line.split("=", 1)[0] for line in output if "=" in line}
+    for name in SECRET_PLACEHOLDERS:
+        if name not in present_names:
+            output.append(f"{name}={secrets.token_urlsafe(24)}")
 
     TARGET.write_text("\n".join(output) + "\n", encoding="utf-8")
     os.chmod(TARGET, 0o600)

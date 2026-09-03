@@ -43,3 +43,16 @@ CREATE TABLE IF NOT EXISTS audit.quality_rejects
 )
 ENGINE = MergeTree
 ORDER BY (source_table, rule_code, batch_id, source_row_number);
+
+-- Journal append-only d'une exécution complète. Une exécution écrit d'abord
+-- RUNNING, puis SUCCESS ou FAILED avec le même run_id.
+CREATE TABLE IF NOT EXISTS audit.pipeline_runs
+(
+    run_id UUID,
+    step LowCardinality(String),
+    status LowCardinality(String),
+    message String,
+    recorded_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY (run_id, recorded_at);

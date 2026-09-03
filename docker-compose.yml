@@ -1,5 +1,9 @@
 name: eds-chu
 
+x-pipeline-build: &pipeline-build
+  context: .
+  dockerfile: docker/pipeline/Dockerfile
+
 services:
   clickhouse:
     image: clickhouse/clickhouse-server:26.8.1.2041
@@ -64,6 +68,46 @@ services:
       timeout: 5s
       retries: 20
       start_period: 45s
+    networks:
+      - eds_network
+
+  scheduler:
+    image: eds-chu-pipeline:local
+    build: *pipeline-build
+    restart: unless-stopped
+    init: true
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      CLICKHOUSE_URL: http://clickhouse:8123
+      PIPELINE_LOG_FILE: /app/logs/pipeline.log
+      TZ: Europe/Paris
+    volumes:
+      - ./:/app:ro
+      - ./data-lake:/app/data-lake
+      - ./logs:/app/logs
+    networks:
+      - eds_network
+
+  metabase-setup:
+    image: eds-chu-pipeline:local
+    build: *pipeline-build
+    restart: "no"
+    depends_on:
+      metabase:
+        condition: service_healthy
+    env_file:
+      - .env
+    environment:
+      METABASE_URL: http://metabase:3000
+      METABASE_CLICKHOUSE_HOST: clickhouse
+      TZ: Europe/Paris
+    volumes:
+      - ./:/app:ro
+    command: ["python", "scripts/setup_metabase.py"]
     networks:
       - eds_network
 

@@ -11,6 +11,8 @@ source-filestorage/
 data-lake/
 clickhouse-data/
 metabase-data/
+logs/*.log
+!logs/.gitkeep
 
 # Python
 .venv/

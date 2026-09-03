@@ -1,17 +1,20 @@
-# Pipeline Lake → Bronze → Silver
+# Pipeline Lake → Bronze → Silver → Gold
 
 ## Vue simple
 
 ```mermaid
 flowchart LR
+    K[Scheduler quotidien] --> B
     A[Fichiers déposés par le CHU] --> B[Ingestion incrémentale]
     B --> C[Lake pseudonymisé et versionné]
     C --> D[Tables Bronze typées]
     D --> E{Règles qualité SQL}
     E -->|Lignes valides| F[Dimensions et faits Silver]
     E -->|Lignes invalides| G[Journal des rejets]
+    F --> J[Tables Gold et KPI]
     B --> H[Manifeste JSON]
     D --> I[Audit des chargements]
+    K --> L[Audit des exécutions]
 ```
 
 L'idée est de séparer les responsabilités :
@@ -19,6 +22,7 @@ L'idée est de séparer les responsabilités :
 - le **Lake** conserve les fichiers reçus, mais sans identité patient directe ;
 - **Bronze** conserve les lignes détaillées, typées et traçables ;
 - **Silver** ne garde que les données cohérentes et prêtes pour l'analyse ;
+- **Gold** agrège les données pour répondre directement aux dashboards ;
 - `audit` explique ce qui a été chargé ou rejeté.
 
 ## 1. Préparer l'environnement
@@ -120,16 +124,16 @@ dans [`sql/silver`](../sql/silver) et s'exécutent dans cet ordre :
 5. monitoring.
 
 Cet ordre suit les dépendances. Par exemple, un séjour a besoin d'un patient et
-d'un service connus. Un diagnostic ou un relevé de monitoring a ensuite besoin
-d'un séjour accepté.
+d'un service connus. Un diagnostic ou un relevé de monitoring a besoin d'un
+séjour source connu pour récupérer son contexte.
 
 Quelques règles concrètes :
 
 - une sortie antérieure à l'admission rejette le séjour ;
 - une sortie renseignée sans mode de sortie rejette le séjour ;
-- un diagnostic lié à un séjour rejeté est lui aussi rejeté ;
 - une fréquence cardiaque doit rester entre 20 et 250 bpm ;
-- un relevé doit se situer pendant le séjour.
+- une anomalie de durée du séjour ne rejette pas en cascade un diagnostic ou un
+  relevé qui respecte ses propres règles.
 
 Une ligne invalide est écrite dans `audit.quality_rejects` avec sa règle, sa clé,
 son fichier et son numéro de ligne. Elle reste également en Bronze.
@@ -142,8 +146,8 @@ Le pipeline a été exécuté sur les 89 fichiers du jeu corrigé :
 | -------------- | ---------------------------: | ----------------------: | -----: |
 | Patients       |              18 000 versions | 6 000 patients courants |      0 |
 | Séjours        |                        6 797 |                   6 729 |     68 |
-| Diagnostics    | 12 720 diagnostics imbriqués |                  12 593 |    127 |
-| Monitoring     |                       41 778 |                  40 400 |  1 378 |
+| Diagnostics    | 12 720 diagnostics imbriqués |                  12 720 |      0 |
+| Monitoring     |                       41 778 |                  40 920 |    858 |
 | Services       |                            8 |                       8 |      0 |
 | CIM-10         |                           13 |                      13 |      0 |
 
@@ -191,6 +195,9 @@ python3 scripts/run_pipeline.py --step bronze
 # Exécuter uniquement les transformations Silver depuis Bronze
 python3 scripts/run_pipeline.py --step silver
 
+# Reconstruire uniquement les KPI Gold depuis Silver
+python3 scripts/run_pipeline.py --step gold
+
 # Lancer les tests de pseudonymisation et d'idempotence
 python3 -m unittest discover -s tests -v
 ```
@@ -198,3 +205,14 @@ python3 -m unittest discover -s tests -v
 Les répertoires `source-filestorage`, `data-lake` et le fichier `.env` restent
 locaux et sont exclus de Git. Seuls les scripts, le SQL et la documentation sont
 publiés.
+
+## 9. Orchestration et exploitation
+
+Le service Docker `scheduler` lance le pipeline au démarrage puis chaque jour à
+02:00. Chaque exécution reçoit un `run_id` et écrit les événements `RUNNING`,
+`SUCCESS` ou `FAILED` dans `audit.pipeline_runs`. Le détail lisible est conservé
+dans `logs/pipeline.log`.
+
+Les procédures de surveillance et de reprise sont décrites dans le
+[guide d'exploitation](./exploitation.md). Les dashboards et leurs droits sont
+décrits dans la [documentation Metabase](./dashboards-metabase.md).

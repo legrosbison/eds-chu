@@ -397,9 +397,9 @@
       },
       {
         id: "fact_diagnosis", type: "factless", x: 515, y: 555, w: 430,
-        title: "fact_diagnosis", source: "diagnostics.json aplati puis enrichi via le séjour",
+        title: "fact_diagnosis", source: "diagnostics.json aplati puis enrichi via le contexte Bronze du séjour",
         grain: "Une ligne par séjour, code CIM-10 et type de diagnostic.",
-        why: "L'association d'un diagnostic à un séjour est un événement comptable. C'est un fait sans mesure numérique : COUNT ou COUNT DISTINCT patient_key fournit la prévalence.",
+        why: "L'association d'un diagnostic à un séjour est un événement comptable. C'est un fait sans mesure numérique : COUNT DISTINCT patient_key fournit la taille de la cohorte.",
         fields: [
           { kind: "DD", name: "stay_id", description: "Identifiant du séjour, dimension dégénérée." },
           { kind: "FK", name: "diagnosis_code", description: "Relation vers dim_diagnosis ; participe à l'unicité." },
@@ -408,12 +408,12 @@
           { kind: "FK", name: "service_code", description: "Recopié du séjour pour joindre directement dim_service." },
           { kind: "FK", name: "admission_date_key", description: "Date d'admission du séjour ; la source diagnostic ne fournit pas de date propre." }
         ],
-        rules: ["Aplatir le tableau JSON : un élément du tableau devient une ligne.", "Dédupliquer sur stay_id + diagnosis_code + diagnosis_type."],
+        rules: ["Aplatir le tableau JSON : un élément du tableau devient une ligne.", "Dédupliquer sur stay_id + diagnosis_code + diagnosis_type.", "Ne pas rejeter en cascade un diagnostic valide à cause d'une durée de séjour invalide."],
         kpis: ["Prévalence par pathologie", "Cohortes par âge et sexe"]
       },
       {
         id: "fact_monitoring", type: "fact", x: 1010, y: 730, w: 430,
-        title: "fact_monitoring", source: "monitoring.parquet enrichi via le séjour",
+        title: "fact_monitoring", source: "monitoring.parquet enrichi via le contexte Bronze du séjour",
         grain: "Une ligne par séjour et horodatage de relevé.",
         why: "Un relevé est un événement mesurable. La table reste séparée car son volume est très supérieur aux autres sources.",
         fields: [
@@ -426,7 +426,7 @@
           { kind: "MES", name: "spo2", description: "Saturation en oxygène en %." },
           { kind: "MES", name: "temp_c", description: "Température en degrés Celsius." }
         ],
-        rules: ["Conserver FC entre 20 et 250 bpm.", "Conserver SpO2 entre 50 et 100 %.", "Conserver la température entre 30 et 45 °C.", "Les seuils d'alerte clinique ne sont pas fournis par le sujet."],
+        rules: ["Conserver FC entre 20 et 250 bpm.", "Conserver SpO2 entre 50 et 100 %.", "Conserver la température entre 30 et 45 °C.", "Ne pas rejeter en cascade un relevé capteur valide à cause de la durée du séjour.", "Seuils Gold du corrigé : SpO2 < 92, FC < 50 ou > 100, température > 38,5 °C."],
         kpis: ["Nombre de relevés par jour", "Relevés en alerte après validation des seuils métier"]
       }
     ];
