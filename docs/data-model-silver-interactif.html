@@ -268,6 +268,7 @@
         <button class="filter-button" data-filter="fact_stay">Séjours</button>
         <button class="filter-button" data-filter="fact_diagnosis">Diagnostics</button>
         <button class="filter-button" data-filter="fact_monitoring">Monitoring</button>
+        <button class="filter-button" data-filter="fact_acte">Actes</button>
       </nav>
     </header>
 
@@ -279,7 +280,7 @@
           <button class="icon-button" id="resetView" title="Réinitialiser la vue">Centrer</button>
           <button class="icon-button" id="zoomIn" title="Zoomer">+</button>
         </div>
-        <svg id="modelSvg" viewBox="0 0 1800 1080" role="img" aria-label="Constellation de faits Silver">
+        <svg id="modelSvg" viewBox="0 0 2100 1200" role="img" aria-label="Constellation de faits Silver">
           <defs id="svgDefs">
             <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
               <feDropShadow dx="0" dy="6" stdDeviation="7" flood-color="#1e304e" flood-opacity=".10"/>
@@ -310,7 +311,8 @@
       dim_patient: "#c026d3",
       dim_service: "#7c3aed",
       dim_date: "#d97706",
-      dim_diagnosis: "#0f766e"
+      dim_diagnosis: "#0f766e",
+      dim_ccam: "#be123c"
     };
 
     const technicalFields = [
@@ -322,7 +324,7 @@
 
     const nodes = [
       {
-        id: "dim_patient", type: "dimension", x: 45, y: 145, w: 340,
+        id: "dim_patient", type: "dimension", x: 45, y: 100, w: 340,
         title: "dim_patient", source: "patients.csv après pseudonymisation",
         grain: "Une ligne par patient pseudonymisé.",
         why: "Le patient est un axe d'analyse : on étudie une cohorte par âge, sexe ou région. Ce n'est pas un événement à compter.",
@@ -337,18 +339,21 @@
       },
       {
         id: "dim_service", type: "dimension", x: 45, y: 500, w: 340,
-        title: "dim_service", source: "referentiels/services.csv",
+        title: "dim_service", source: "services.csv + description_service.csv",
         grain: "Une ligne par service hospitalier.",
         why: "Le service est le « par service » du cours : c'est donc une dimension et non un fait.",
         fields: [
           { kind: "PK", name: "service_code", description: "Code stable du service." },
-          { kind: "ATTR", name: "service_label", description: "Libellé lisible du service." }
+          { kind: "ATTR", name: "service_label", description: "Libellé lisible du service." },
+          { kind: "ATTR", name: "categorie", description: "Niveau d'analyse regroupant plusieurs services." },
+          { kind: "ATTR", name: "capacite_lits", description: "Capacité du service ; nullable si la description manque." },
+          { kind: "ATTR", name: "pole", description: "Pôle hospitalier du service." }
         ],
-        rules: ["Conserver un code unique et un libellé non vide."],
-        kpis: ["DMS par service", "Activité des urgences par service"]
+        rules: ["Conserver un code unique et un libellé non vide.", "Garder un service non décrit avec catégorie, capacité et pôle à NULL."],
+        kpis: ["DMS par service ou catégorie", "Activité des urgences", "Actes par service et par lit"]
       },
       {
-        id: "dim_date", type: "dimension", x: 1415, y: 145, w: 340,
+        id: "dim_date", type: "dimension", x: 1715, y: 100, w: 340,
         title: "dim_date", source: "Calendrier généré dans l'entrepôt",
         grain: "Une ligne par jour calendaire.",
         why: "Jour, semaine, mois et année sont des axes d'analyse réutilisés par tous les faits.",
@@ -360,10 +365,10 @@
           { kind: "ATTR", name: "year", description: "Année." }
         ],
         rules: ["Dans fact_stay, la même dimension joue deux rôles : date d'admission et date de sortie."],
-        kpis: ["Passages par jour", "Relevés par jour", "Évolution mensuelle"]
+        kpis: ["Passages par jour", "Relevés et actes par jour", "Évolution mensuelle"]
       },
       {
-        id: "dim_diagnosis", type: "dimension", x: 1415, y: 520, w: 340,
+        id: "dim_diagnosis", type: "dimension", x: 1715, y: 480, w: 340,
         title: "dim_diagnosis", source: "referentiels/cim10.csv",
         grain: "Une ligne par code CIM-10.",
         why: "La pathologie est le « par diagnostic » de la prévalence. Le référentiel code → libellé est donc une dimension.",
@@ -375,7 +380,20 @@
         kpis: ["Taille des cohortes par pathologie"]
       },
       {
-        id: "fact_stay", type: "fact", x: 515, y: 75, w: 430,
+        id: "dim_ccam", type: "dimension", x: 1715, y: 830, w: 340,
+        title: "dim_ccam", source: "referentiels/ccam.csv",
+        grain: "Une ligne par code d'acte CCAM.",
+        why: "Le code, le libellé et le tarif décrivent un type d'acte. Ils servent à grouper et valoriser les événements de fact_acte.",
+        fields: [
+          { kind: "PK", name: "code_ccam", description: "Code unique du type d'acte." },
+          { kind: "ATTR", name: "libelle", description: "Libellé lisible de l'acte." },
+          { kind: "ATTR", name: "tarif_euros", description: "Tarif unitaire utilisé pour la valorisation T2A." }
+        ],
+        rules: ["Conserver un code et un libellé non vides.", "Rejeter un tarif absent ou négatif."],
+        kpis: ["Actes par type", "Montant facturé par service"]
+      },
+      {
+        id: "fact_stay", type: "fact", x: 500, y: 75, w: 430,
         title: "fact_stay", source: "sejours.csv enrichi avec patient et service",
         grain: "Une ligne par passage à l'hôpital.",
         why: "Le séjour est un événement mesurable : on compte les passages et on calcule leur durée.",
@@ -396,7 +414,7 @@
         kpis: ["Durée moyenne de séjour", "Passages aux urgences", "Réadmission à 30 jours"]
       },
       {
-        id: "fact_diagnosis", type: "factless", x: 515, y: 555, w: 430,
+        id: "fact_diagnosis", type: "factless", x: 500, y: 565, w: 430,
         title: "fact_diagnosis", source: "diagnostics.json aplati puis enrichi via le contexte Bronze du séjour",
         grain: "Une ligne par séjour, code CIM-10 et type de diagnostic.",
         why: "L'association d'un diagnostic à un séjour est un événement comptable. C'est un fait sans mesure numérique : COUNT DISTINCT patient_key fournit la taille de la cohorte.",
@@ -412,7 +430,7 @@
         kpis: ["Prévalence par pathologie", "Cohortes par âge et sexe"]
       },
       {
-        id: "fact_monitoring", type: "fact", x: 1010, y: 730, w: 430,
+        id: "fact_monitoring", type: "fact", x: 1050, y: 790, w: 430,
         title: "fact_monitoring", source: "monitoring.parquet enrichi via le contexte Bronze du séjour",
         grain: "Une ligne par séjour et horodatage de relevé.",
         why: "Un relevé est un événement mesurable. La table reste séparée car son volume est très supérieur aux autres sources.",
@@ -428,6 +446,21 @@
         ],
         rules: ["Conserver FC entre 20 et 250 bpm.", "Conserver SpO2 entre 50 et 100 %.", "Conserver la température entre 30 et 45 °C.", "Ne pas rejeter en cascade un relevé capteur valide à cause de la durée du séjour.", "Seuils Gold du corrigé : SpO2 < 92, FC < 50 ou > 100, température > 38,5 °C."],
         kpis: ["Nombre de relevés par jour", "Relevés en alerte après validation des seuils métier"]
+      },
+      {
+        id: "fact_acte", type: "fact", x: 1050, y: 360, w: 430,
+        title: "fact_acte", source: "actes.parquet enrichi via le contexte Bronze du séjour",
+        grain: "Une ligne par séjour, code CCAM et horodatage d'acte.",
+        why: "Un acte réalisé est un événement à compter. Son type, son service et sa date sont les axes d'analyse.",
+        fields: [
+          { kind: "DD", name: "stay_id", description: "Identifiant du séjour conservé comme dimension dégénérée." },
+          { kind: "FK", name: "service_code", description: "Récupéré depuis le séjour Bronze puis relié directement à dim_service." },
+          { kind: "FK", name: "code_ccam", description: "Relation vers dim_ccam." },
+          { kind: "FK", name: "act_date_key", description: "Date extraite de acte_ts, relation vers dim_date." },
+          { kind: "PK", name: "acte_ts", description: "Horodatage précis de réalisation de l'acte." }
+        ],
+        rules: ["Exiger un séjour source et un code CCAM connus.", "Ne pas joindre fact_acte à fact_stay : recopier service_code pendant la transformation Silver.", "Ne pas rejeter en cascade un acte valide à cause d'une durée de séjour invalide."],
+        kpis: ["Actes par service", "Actes par type", "Actes par lit", "Montant facturé T2A"]
       }
     ];
 
@@ -438,10 +471,13 @@
       { from: "dim_service", to: "fact_stay", field: "service_code", role: "Un service accueille plusieurs séjours." },
       { from: "dim_service", to: "fact_diagnosis", field: "service_code", role: "Un service est associé à plusieurs diagnostics enregistrés." },
       { from: "dim_service", to: "fact_monitoring", field: "service_code", role: "Un service produit plusieurs relevés." },
+      { from: "dim_service", to: "fact_acte", field: "service_code", role: "Un service réalise plusieurs actes ; le code est recopié depuis le contexte du séjour." },
       { from: "dim_date", to: "fact_stay", field: "admission_date_key / discharge_date_key", role: "Une date concerne plusieurs admissions ou sorties ; la dimension joue deux rôles." },
       { from: "dim_date", to: "fact_diagnosis", field: "admission_date_key", role: "Une date d'admission peut concerner plusieurs diagnostics de séjour." },
       { from: "dim_date", to: "fact_monitoring", field: "measurement_date_key", role: "Une date regroupe plusieurs relevés." },
-      { from: "dim_diagnosis", to: "fact_diagnosis", field: "diagnosis_code", role: "Un code CIM-10 peut apparaître dans plusieurs événements diagnostic." }
+      { from: "dim_date", to: "fact_acte", field: "act_date_key", role: "Une date peut regrouper plusieurs actes." },
+      { from: "dim_diagnosis", to: "fact_diagnosis", field: "diagnosis_code", role: "Un code CIM-10 peut apparaître dans plusieurs événements diagnostic." },
+      { from: "dim_ccam", to: "fact_acte", field: "code_ccam", role: "Un type CCAM peut être réalisé plusieurs fois." }
     ];
 
     const nodeById = Object.fromEntries(nodes.map(node => [node.id, node]));
@@ -454,7 +490,7 @@
     let activeFilter = "all";
     let selectedNode = null;
     let selectedRelation = null;
-    let view = { x: 0, y: 0, w: 1800, h: 1080 };
+    let view = { x: 0, y: 0, w: 2100, h: 1200 };
     let drag = null;
     let pan = null;
 
@@ -669,8 +705,8 @@
         <div class="rule-card"><strong>Règle du cours</strong><p>Ce que l'on compte ou mesure est un <b>fait</b>. Le « par… » utilisé pour grouper est une <b>dimension</b>.</p></div>
         <h3>Application au CHU</h3>
         <ul>
-          <li><b>Événements :</b> un séjour, un diagnostic associé, un relevé de monitoring.</li>
-          <li><b>Axes d'analyse :</b> patient, service, date et pathologie.</li>
+          <li><b>Événements :</b> un séjour, un diagnostic associé, un relevé de monitoring ou un acte.</li>
+          <li><b>Axes d'analyse :</b> patient, service, date, pathologie et code CCAM.</li>
           <li>Une dimension est du côté <b>1</b> ; chaque fait est du côté <b>N</b>.</li>
           <li>Les dimensions sont partagées : on obtient une petite constellation de faits.</li>
         </ul>
@@ -790,7 +826,7 @@
 
     function zoom(factor, centerX = view.x + view.w / 2, centerY = view.y + view.h / 2) {
       const newW = Math.min(3200, Math.max(700, view.w * factor));
-      const newH = newW * 1080 / 1800;
+      const newH = newW * 1200 / 2100;
       const rx = (centerX - view.x) / view.w;
       const ry = (centerY - view.y) / view.h;
       view.x = centerX - rx * newW;
@@ -808,7 +844,7 @@
 
     document.getElementById("zoomIn").addEventListener("click", () => zoom(.82));
     document.getElementById("zoomOut").addEventListener("click", () => zoom(1.18));
-    document.getElementById("resetView").addEventListener("click", () => { view = { x: 0, y: 0, w: 1800, h: 1080 }; updateView(); });
+    document.getElementById("resetView").addEventListener("click", () => { view = { x: 0, y: 0, w: 2100, h: 1200 }; updateView(); });
     document.querySelectorAll(".filter-button").forEach(button => button.addEventListener("click", () => setFilter(button.dataset.filter)));
 
     makeMarkers();

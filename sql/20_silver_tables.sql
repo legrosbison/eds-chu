@@ -17,12 +17,25 @@ CREATE TABLE IF NOT EXISTS silver.dim_service
 (
     service_code String,
     service_label String,
+    categorie Nullable(String),
+    capacite_lits Nullable(UInt16),
+    pole Nullable(String),
     source_date Date,
     batch_id UUID,
     processed_at DateTime64(3, 'UTC')
 )
 ENGINE = ReplacingMergeTree(source_date)
 ORDER BY service_code;
+
+-- Migration non destructive pour une base créée avant le dépôt du 2026-08-29.
+ALTER TABLE silver.dim_service
+    ADD COLUMN IF NOT EXISTS categorie Nullable(String) AFTER service_label;
+
+ALTER TABLE silver.dim_service
+    ADD COLUMN IF NOT EXISTS capacite_lits Nullable(UInt16) AFTER categorie;
+
+ALTER TABLE silver.dim_service
+    ADD COLUMN IF NOT EXISTS pole Nullable(String) AFTER capacite_lits;
 
 CREATE TABLE IF NOT EXISTS silver.dim_diagnosis
 (
@@ -34,6 +47,18 @@ CREATE TABLE IF NOT EXISTS silver.dim_diagnosis
 )
 ENGINE = ReplacingMergeTree(source_date)
 ORDER BY diagnosis_code;
+
+CREATE TABLE IF NOT EXISTS silver.dim_ccam
+(
+    code_ccam String,
+    libelle String,
+    tarif_euros Decimal(10, 2),
+    source_date Date,
+    batch_id UUID,
+    processed_at DateTime64(3, 'UTC')
+)
+ENGINE = ReplacingMergeTree(source_date)
+ORDER BY code_ccam;
 
 CREATE TABLE IF NOT EXISTS silver.dim_date
 (
@@ -106,3 +131,20 @@ CREATE TABLE IF NOT EXISTS silver.fact_monitoring
 ENGINE = ReplacingMergeTree(processed_at)
 PARTITION BY toYYYYMM(measurement_date_key)
 ORDER BY (measurement_date_key, stay_id, ts);
+
+CREATE TABLE IF NOT EXISTS silver.fact_acte
+(
+    stay_id String,
+    service_code String,
+    code_ccam String,
+    act_date_key Date,
+    acte_ts DateTime64(3, 'UTC'),
+    source_date Date,
+    source_file String,
+    source_row_number UInt64,
+    batch_id UUID,
+    processed_at DateTime64(3, 'UTC')
+)
+ENGINE = ReplacingMergeTree(processed_at)
+PARTITION BY toYYYYMM(act_date_key)
+ORDER BY (act_date_key, service_code, stay_id, code_ccam, acte_ts);

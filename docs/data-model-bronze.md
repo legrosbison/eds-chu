@@ -23,7 +23,10 @@ erDiagram
     BRONZE_SERVICES ||--o{ BRONZE_STAYS : "service_code logique"
     BRONZE_STAYS ||--o| BRONZE_DIAGNOSTICS : "stay_id logique"
     BRONZE_STAYS ||--o{ BRONZE_MONITORING : "stay_id logique"
+    BRONZE_STAYS ||--o{ BRONZE_ACTS : "stay_id logique"
     BRONZE_CIM10 }o--o{ BRONZE_DIAGNOSTICS : "codes dans le tableau"
+    BRONZE_CCAM ||--o{ BRONZE_ACTS : "code_ccam logique"
+    BRONZE_SERVICES ||--o| BRONZE_SERVICE_DESCRIPTIONS : "service_code logique"
 
     AUDIT_INGESTION_FILES ||--o{ BRONZE_PATIENTS : "batch_id"
     AUDIT_INGESTION_FILES ||--o{ BRONZE_STAYS : "batch_id"
@@ -68,6 +71,25 @@ erDiagram
     BRONZE_CIM10 {
         String code_cim10
         String diagnosis_label
+    }
+
+    BRONZE_SERVICE_DESCRIPTIONS {
+        String service_code
+        Nullable_String categorie
+        Nullable_Int32 capacite_lits
+        Nullable_String pole
+    }
+
+    BRONZE_CCAM {
+        String code_ccam
+        Nullable_String libelle
+        Nullable_Int32 tarif_euros
+    }
+
+    BRONZE_ACTS {
+        String stay_id
+        String code_ccam
+        Nullable_DateTime64 acte_ts
     }
 
     AUDIT_INGESTION_FILES {
@@ -115,6 +137,9 @@ Si cette ligne est rejetée en Silver, ces informations permettent de retrouver 
 | `bronze.monitoring`     | Une ligne par relevé Parquet                     | Les constantes, même hors plage                             |
 | `bronze.services`       | Une ligne par ligne du référentiel service       | Le code et le libellé source                                |
 | `bronze.cim10`          | Une ligne par ligne du référentiel CIM-10        | Le code et le libellé source                                |
+| `bronze.service_descriptions` | Une ligne par description de service       | Catégorie, capacité en lits et pôle, même incomplets        |
+| `bronze.ccam`           | Une ligne par code du référentiel CCAM            | Le code, le libellé et le tarif source                      |
+| `bronze.acts`           | Une ligne par acte du fichier Parquet             | Le séjour, le code CCAM et l'horodatage                     |
 | `audit.ingestion_files` | Une ligne par fichier traité                     | Le statut de l'ingestion et son empreinte                   |
 
 ## 5. Pourquoi les colonnes sont `Nullable` ?
@@ -250,6 +275,9 @@ Un second lancement voit la même empreinte et ne recharge pas les 6 000 lignes.
 | Diagnostics sous forme de tableau            | Aplatir et contrôler CIM-10                    | `fact_diagnosis`               |
 | Toutes les constantes                        | Appliquer les bornes physiologiques            | `fact_monitoring` + rejets     |
 | Référentiels bruts                           | Dédupliquer codes et libellés                  | `dim_service`, `dim_diagnosis` |
+| Description des services                     | Enrichir sans supprimer les services absents   | `dim_service`                  |
+| Référentiel CCAM                             | Contrôler code, libellé et tarif               | `dim_ccam`                     |
+| Actes médicaux                               | Contrôler les clés et récupérer le service     | `fact_acte`                    |
 
 Le résumé à retenir est :
 

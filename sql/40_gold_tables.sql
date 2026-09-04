@@ -66,3 +66,60 @@ CREATE TABLE IF NOT EXISTS gold.kpi_cohort_demographics
 )
 ENGINE = MergeTree
 ORDER BY (diagnosis_code, age_band, sex);
+
+CREATE TABLE IF NOT EXISTS gold.kpi_activity_dms_category
+(
+    categorie String,
+    stay_count UInt64,
+    closed_stay_count UInt64,
+    average_length_of_stay_days Float64,
+    average_length_of_stay_hours Float64,
+    computed_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY categorie;
+
+CREATE TABLE IF NOT EXISTS gold.kpi_acts_service
+(
+    service_code String,
+    service_label String,
+    act_count UInt64,
+    stay_with_act_count UInt64,
+    average_acts_per_stay Float64,
+    computed_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY service_code;
+
+CREATE TABLE IF NOT EXISTS gold.kpi_acts_type
+(
+    code_ccam String,
+    act_label String,
+    act_count UInt64,
+    computed_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY code_ccam;
+
+CREATE TABLE IF NOT EXISTS gold.kpi_act_density_bed
+(
+    service_code String,
+    service_label String,
+    act_count UInt64,
+    capacite_lits Nullable(UInt16),
+    acts_per_bed Nullable(Float64),
+    computed_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY service_code;
+
+CREATE TABLE IF NOT EXISTS gold.kpi_billed_amount_service
+(
+    service_code String,
+    service_label String,
+    act_count UInt64,
+    billed_amount_euros Decimal(18, 2),
+    computed_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY service_code;

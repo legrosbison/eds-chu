@@ -88,3 +88,47 @@ CREATE TABLE IF NOT EXISTS bronze.cim10
 )
 ENGINE = MergeTree
 ORDER BY (source_date, batch_id, source_row_number);
+
+CREATE TABLE IF NOT EXISTS bronze.service_descriptions
+(
+    service_code String,
+    categorie Nullable(String),
+    capacite_lits Nullable(Int32),
+    pole Nullable(String),
+    source_date Date,
+    source_file String,
+    source_row_number UInt64,
+    batch_id UUID,
+    ingested_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY (source_date, batch_id, source_row_number);
+
+CREATE TABLE IF NOT EXISTS bronze.ccam
+(
+    code_ccam String,
+    libelle Nullable(String),
+    tarif_euros Nullable(Int32),
+    source_date Date,
+    source_file String,
+    source_row_number UInt64,
+    batch_id UUID,
+    ingested_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+ORDER BY (source_date, batch_id, source_row_number);
+
+CREATE TABLE IF NOT EXISTS bronze.acts
+(
+    stay_id String,
+    code_ccam String,
+    acte_ts Nullable(DateTime64(3, 'UTC')),
+    source_date Date,
+    source_file String,
+    source_row_number UInt64,
+    batch_id UUID,
+    ingested_at DateTime64(3, 'UTC')
+)
+ENGINE = MergeTree
+PARTITION BY toYYYYMM(source_date)
+ORDER BY (source_date, stay_id, batch_id, source_row_number);

@@ -25,11 +25,17 @@ ROOT = Path(__file__).resolve().parents[1]
 # dépendent des séjours passent en dernier.
 BRONZE_CONFIG: dict[str, dict[str, Any]] = {
     "services": {"table": "bronze.services", "priority": 10},
-    "cim10": {"table": "bronze.cim10", "priority": 11},
+    "description_service": {
+        "table": "bronze.service_descriptions",
+        "priority": 11,
+    },
+    "cim10": {"table": "bronze.cim10", "priority": 12},
+    "ccam": {"table": "bronze.ccam", "priority": 13},
     "patients": {"table": "bronze.patients", "priority": 20},
     "sejours": {"table": "bronze.stays", "priority": 30},
     "diagnostics": {"table": "bronze.diagnostics", "priority": 40},
     "monitoring": {"table": "bronze.monitoring", "priority": 50},
+    "actes": {"table": "bronze.acts", "priority": 60},
 }
 
 SILVER_CONFIG: dict[str, dict[str, Any]] = {
@@ -40,12 +46,26 @@ SILVER_CONFIG: dict[str, dict[str, Any]] = {
         "cleanup": ["silver.dim_service"],
         "priority": 10,
     },
+    "description_service": {
+        "script": "sql/silver/36_service_descriptions.sql",
+        "source": "bronze.service_descriptions",
+        "primary": "silver.dim_service",
+        "cleanup": ["silver.dim_service"],
+        "priority": 11,
+    },
     "cim10": {
         "script": "sql/silver/32_cim10.sql",
         "source": "bronze.cim10",
         "primary": "silver.dim_diagnosis",
         "cleanup": ["silver.dim_diagnosis"],
-        "priority": 11,
+        "priority": 12,
+    },
+    "ccam": {
+        "script": "sql/silver/37_ccam.sql",
+        "source": "bronze.ccam",
+        "primary": "silver.dim_ccam",
+        "cleanup": ["silver.dim_ccam"],
+        "priority": 13,
     },
     "patients": {
         "script": "sql/silver/30_patients.sql",
@@ -75,6 +95,13 @@ SILVER_CONFIG: dict[str, dict[str, Any]] = {
         "cleanup": ["silver.fact_monitoring", "silver.dim_date"],
         "priority": 50,
     },
+    "actes": {
+        "script": "sql/silver/38_acts.sql",
+        "source": "bronze.acts",
+        "primary": "silver.fact_acte",
+        "cleanup": ["silver.fact_acte", "silver.dim_date"],
+        "priority": 60,
+    },
 }
 
 GOLD_TABLES = (
@@ -84,6 +111,11 @@ GOLD_TABLES = (
     "gold.kpi_monitoring_alert_daily",
     "gold.kpi_pathology_prevalence",
     "gold.kpi_cohort_demographics",
+    "gold.kpi_activity_dms_category",
+    "gold.kpi_acts_service",
+    "gold.kpi_acts_type",
+    "gold.kpi_act_density_bed",
+    "gold.kpi_billed_amount_service",
 )
 
 
@@ -341,6 +373,30 @@ def bronze_insert_query(domain: str) -> str:
             FROM input('code_cim10 String, libelle String')
             SETTINGS max_threads = 1
             FORMAT CSV
+        """,
+        "description_service": f"""
+            INSERT INTO bronze.service_descriptions
+            SELECT service_code, nullIf(categorie, ''),
+                   toInt32OrNull(nullIf(capacite_lits, '')), nullIf(pole, ''),
+                   {common}
+            FROM input('service_code String, categorie String, capacite_lits String, pole String')
+            SETTINGS max_threads = 1
+            FORMAT CSV
+        """,
+        "ccam": f"""
+            INSERT INTO bronze.ccam
+            SELECT code_ccam, nullIf(libelle, ''),
+                   toInt32OrNull(nullIf(tarif_euros, '')), {common}
+            FROM input('code_ccam String, libelle String, tarif_euros String')
+            SETTINGS max_threads = 1
+            FORMAT CSV
+        """,
+        "actes": f"""
+            INSERT INTO bronze.acts
+            SELECT stay_id, code_ccam, acte_ts, {common}
+            FROM input('stay_id String, code_ccam String, acte_ts Nullable(DateTime64(3))')
+            SETTINGS max_threads = 1
+            FORMAT Parquet
         """,
     }
     return queries[domain]

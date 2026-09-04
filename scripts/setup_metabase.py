@@ -98,7 +98,9 @@ def ensure_database(client: MetabaseClient) -> int:
     databases = list_items(client.request("GET", "/api/database"))
     existing = next((item for item in databases if item.get("name") == name), None)
     if existing:
-        return int(existing["id"])
+        database_id = int(existing["id"])
+        client.request("POST", f"/api/database/{database_id}/sync_schema")
+        return database_id
 
     created = client.request(
         "POST",
@@ -403,6 +405,82 @@ def create_pilotage_cards(
             dimensions=["date"],
             metrics=["releves", "alertes"],
         ),
+        card_payload(
+            name="Pilotage - Activité et DMS par catégorie",
+            description="Séjours totaux et clos, avec DMS calculée uniquement sur les séjours clos.",
+            collection_id=collection_id,
+            database_id=database_id,
+            query="""
+                SELECT categorie,
+                       stay_count AS sejours,
+                       closed_stay_count AS sejours_clos,
+                       average_length_of_stay_days AS dms_jours
+                FROM kpi_activity_dms_category
+                ORDER BY dms_jours DESC
+            """,
+            display="table",
+        ),
+        card_payload(
+            name="Pilotage - Actes par service",
+            description="Nombre d'actes et moyenne par séjour comportant au moins un acte.",
+            collection_id=collection_id,
+            database_id=database_id,
+            query="""
+                SELECT service_label AS service,
+                       act_count AS actes,
+                       stay_with_act_count AS sejours_avec_acte,
+                       average_acts_per_stay AS actes_par_sejour
+                FROM kpi_acts_service
+                ORDER BY actes DESC
+            """,
+            display="table",
+        ),
+        card_payload(
+            name="Pilotage - Actes par type",
+            description="Codes et libellés CCAM classés par fréquence.",
+            collection_id=collection_id,
+            database_id=database_id,
+            query="""
+                SELECT concat(code_ccam, ' - ', act_label) AS type_acte,
+                       act_count AS actes
+                FROM kpi_acts_type
+                ORDER BY actes DESC
+            """,
+            display="bar",
+            dimensions=["type_acte"],
+            metrics=["actes"],
+        ),
+        card_payload(
+            name="Pilotage - Densité d'actes par lit",
+            description="Nombre d'actes rapporté à la capacité en lits ; Neurologie reste non calculable.",
+            collection_id=collection_id,
+            database_id=database_id,
+            query="""
+                SELECT service_label AS service,
+                       acts_per_bed AS actes_par_lit
+                FROM kpi_act_density_bed
+                WHERE acts_per_bed IS NOT NULL
+                ORDER BY actes_par_lit DESC
+            """,
+            display="bar",
+            dimensions=["service"],
+            metrics=["actes_par_lit"],
+        ),
+        card_payload(
+            name="Pilotage - Montant facturé par service",
+            description="Somme des tarifs CCAM des actes réalisés, selon la règle T2A du sujet.",
+            collection_id=collection_id,
+            database_id=database_id,
+            query="""
+                SELECT service_label AS service,
+                       billed_amount_euros AS montant_euros
+                FROM kpi_billed_amount_service
+                ORDER BY montant_euros DESC
+            """,
+            display="bar",
+            dimensions=["service"],
+            metrics=["montant_euros"],
+        ),
     ]
     return [ensure_card(client, payload) for payload in definitions]
 
@@ -487,7 +565,7 @@ def main() -> None:
     pilotage_collection_id = ensure_collection(
         client,
         "Pilotage hospitalier",
-        "DMS, urgences, réadmissions et surveillance des constantes.",
+        "DMS, urgences, réadmissions, surveillance et activité des actes.",
     )
     research_collection_id = ensure_collection(
         client,
@@ -512,6 +590,11 @@ def main() -> None:
             (pilotage_cards[2], 4, 0, 12, 8),
             (pilotage_cards[3], 12, 0, 12, 8),
             (pilotage_cards[4], 20, 0, 12, 8),
+            (pilotage_cards[5], 28, 0, 12, 8),
+            (pilotage_cards[6], 36, 0, 12, 8),
+            (pilotage_cards[7], 44, 0, 12, 8),
+            (pilotage_cards[8], 52, 0, 12, 8),
+            (pilotage_cards[9], 60, 0, 12, 8),
         ],
     )
     ensure_dashboard(

@@ -122,3 +122,75 @@ SELECT
     if(patient_count < 5, NULL, patient_count),
     now64(3, 'UTC')
 FROM cohorts;
+
+TRUNCATE TABLE gold.kpi_activity_dms_category;
+
+INSERT INTO gold.kpi_activity_dms_category
+SELECT
+    ifNull(d.categorie, 'Non renseignee') AS categorie,
+    count() AS stay_count,
+    countIf(f.discharge_ts IS NOT NULL) AS closed_stay_count,
+    round(avg(toFloat64(f.length_of_stay_hours)) / 24, 2),
+    round(avg(toFloat64(f.length_of_stay_hours)), 1),
+    now64(3, 'UTC')
+FROM (SELECT * FROM silver.fact_stay FINAL) AS f
+LEFT JOIN (SELECT * FROM silver.dim_service FINAL) AS d USING (service_code)
+GROUP BY categorie;
+
+TRUNCATE TABLE gold.kpi_acts_service;
+
+INSERT INTO gold.kpi_acts_service
+SELECT
+    f.service_code,
+    d.service_label,
+    count() AS act_count,
+    uniqExact(f.stay_id) AS stay_with_act_count,
+    round(act_count / stay_with_act_count, 2),
+    now64(3, 'UTC')
+FROM (SELECT * FROM silver.fact_acte FINAL) AS f
+INNER JOIN (SELECT * FROM silver.dim_service FINAL) AS d USING (service_code)
+GROUP BY f.service_code, d.service_label;
+
+TRUNCATE TABLE gold.kpi_acts_type;
+
+INSERT INTO gold.kpi_acts_type
+SELECT
+    f.code_ccam,
+    d.libelle,
+    count() AS act_count,
+    now64(3, 'UTC')
+FROM (SELECT * FROM silver.fact_acte FINAL) AS f
+INNER JOIN (SELECT * FROM silver.dim_ccam FINAL) AS d USING (code_ccam)
+GROUP BY f.code_ccam, d.libelle;
+
+TRUNCATE TABLE gold.kpi_act_density_bed;
+
+INSERT INTO gold.kpi_act_density_bed
+SELECT
+    f.service_code,
+    d.service_label,
+    count() AS act_count,
+    d.capacite_lits,
+    if(
+        d.capacite_lits IS NULL OR d.capacite_lits = 0,
+        NULL,
+        round(act_count / toFloat64(d.capacite_lits), 2)
+    ),
+    now64(3, 'UTC')
+FROM (SELECT * FROM silver.fact_acte FINAL) AS f
+INNER JOIN (SELECT * FROM silver.dim_service FINAL) AS d USING (service_code)
+GROUP BY f.service_code, d.service_label, d.capacite_lits;
+
+TRUNCATE TABLE gold.kpi_billed_amount_service;
+
+INSERT INTO gold.kpi_billed_amount_service
+SELECT
+    f.service_code,
+    s.service_label,
+    count() AS act_count,
+    sum(c.tarif_euros),
+    now64(3, 'UTC')
+FROM (SELECT * FROM silver.fact_acte FINAL) AS f
+INNER JOIN (SELECT * FROM silver.dim_service FINAL) AS s USING (service_code)
+INNER JOIN (SELECT * FROM silver.dim_ccam FINAL) AS c USING (code_ccam)
+GROUP BY f.service_code, s.service_label;

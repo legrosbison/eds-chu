@@ -173,23 +173,57 @@ def profile_patients(paths: list[Path]) -> tuple[dict[str, Any], set[str]]:
     return {"summary": summary, "per_file": per_file}, patient_ids
 
 
-def profile_references(paths: list[Path]) -> tuple[dict[str, Any], set[str], set[str]]:
+def profile_references(
+    paths: list[Path],
+) -> tuple[dict[str, Any], set[str], set[str], set[str]]:
     result: dict[str, Any] = {}
     service_codes: set[str] = set()
     diagnosis_codes: set[str] = set()
+    ccam_codes: set[str] = set()
 
     for path in paths:
         columns, rows = read_csv(path)
-        if "service_code" in columns:
+        if "service_label" in columns:
             key = "services"
             code_column = "service_code"
             label_column = "service_label"
             service_codes.update(row[code_column] for row in rows if row.get(code_column))
-        else:
+        elif "code_cim10" in columns:
             key = "cim10"
             code_column = "code_cim10"
             label_column = "libelle"
             diagnosis_codes.update(row[code_column] for row in rows if row.get(code_column))
+        elif "code_ccam" in columns:
+            key = "ccam"
+            code_column = "code_ccam"
+            label_column = "libelle"
+            ccam_codes.update(row[code_column] for row in rows if row.get(code_column))
+        elif "categorie" in columns:
+            described_codes = {
+                row["service_code"] for row in rows if row.get("service_code")
+            }
+            capacities = [
+                int(row["capacite_lits"])
+                for row in rows
+                if row.get("capacite_lits", "").lstrip("-").isdigit()
+            ]
+            result["service_descriptions"] = {
+                "file": str(path),
+                "bytes": path.stat().st_size,
+                "rows": len(rows),
+                "missing_codes": sum(not row.get("service_code") for row in rows),
+                "missing_categories": sum(not row.get("categorie") for row in rows),
+                "missing_capacities": sum(not row.get("capacite_lits") for row in rows),
+                "missing_poles": sum(not row.get("pole") for row in rows),
+                "duplicate_codes": count_duplicates(
+                    row.get("service_code", "") for row in rows if row.get("service_code")
+                ),
+                "invalid_capacities": sum(value <= 0 for value in capacities),
+                "services_without_description": sorted(service_codes - described_codes),
+            }
+            continue
+        else:
+            continue
         codes = [row.get(code_column, "") for row in rows if row.get(code_column)]
         result[key] = {
             "file": str(path),
@@ -199,8 +233,14 @@ def profile_references(paths: list[Path]) -> tuple[dict[str, Any], set[str], set
             "missing_labels": sum(not row.get(label_column) for row in rows),
             "duplicate_codes": count_duplicates(codes),
         }
+        if key == "ccam":
+            result[key]["invalid_tariffs"] = sum(
+                not row.get("tarif_euros", "").lstrip("-").isdigit()
+                or int(row["tarif_euros"]) < 0
+                for row in rows
+            )
 
-    return result, service_codes, diagnosis_codes
+    return result, service_codes, diagnosis_codes, ccam_codes
 
 
 def profile_stays(
@@ -519,6 +559,81 @@ def profile_monitoring(
     return {"summary": summary, "per_file": per_file}
 
 
+def profile_acts(
+    paths: list[Path],
+    stays_by_id: dict[str, dict[str, Any]],
+    ccam_codes: set[str],
+) -> dict[str, Any]:
+    per_file: list[dict[str, Any]] = []
+    all_keys: list[tuple[str, str, str]] = []
+    totals = Counter()
+
+    for path in paths:
+        parquet = pq.ParquetFile(path)
+        file_counts = Counter()
+        file_keys: list[tuple[str, str, str]] = []
+
+        for batch in parquet.iter_batches(batch_size=65_536):
+            for row in batch.to_pylist():
+                file_counts["rows"] += 1
+                stay_id = row.get("stay_id") or ""
+                code_ccam = row.get("code_ccam") or ""
+                timestamp = safe_datetime(row.get("acte_ts"))
+                invalid = False
+
+                if not stay_id:
+                    file_counts["missing_stay_id"] += 1
+                    invalid = True
+                if not code_ccam:
+                    file_counts["missing_code_ccam"] += 1
+                    invalid = True
+                elif code_ccam not in ccam_codes:
+                    file_counts["unknown_ccam_codes"] += 1
+                    invalid = True
+                if timestamp is None:
+                    file_counts["missing_or_invalid_acte_ts"] += 1
+                    invalid = True
+
+                stay = stays_by_id.get(stay_id)
+                if not stay:
+                    file_counts["unknown_stay_ids"] += 1
+                    invalid = True
+                elif not stay["silver_accepted"]:
+                    file_counts["rows_on_rejected_silver_stay"] += 1
+
+                if invalid:
+                    file_counts["rows_rejected_by_silver_rules"] += 1
+                else:
+                    file_counts["rows_accepted_silver"] += 1
+
+                key = (
+                    stay_id,
+                    code_ccam,
+                    timestamp.isoformat() if timestamp else "",
+                )
+                file_keys.append(key)
+                all_keys.append(key)
+
+        file_result = {
+            "date": deposit_date(path),
+            "file": str(path),
+            "bytes": path.stat().st_size,
+            "row_groups": parquet.metadata.num_row_groups,
+            "duplicate_events_within_file": count_duplicates(file_keys),
+            **dict(file_counts),
+        }
+        per_file.append(file_result)
+        totals.update(file_counts)
+        totals["duplicate_events_within_file"] += file_result[
+            "duplicate_events_within_file"
+        ]
+
+    summary = dict(totals)
+    summary["distinct_act_events"] = len(set(all_keys))
+    summary["duplicate_events_across_all_files"] = count_duplicates(all_keys)
+    return {"summary": summary, "per_file": per_file}
+
+
 def value(data: dict[str, Any], key: str) -> Any:
     return data.get(key, 0)
 
@@ -537,9 +652,10 @@ def build_markdown(profile: dict[str, Any]) -> str:
     stays = profile["stays"]["summary"]
     diagnostics = profile["diagnostics"]["summary"]
     monitoring = profile["monitoring"]["summary"]
+    acts = profile["acts"]["summary"]
 
     inventory_rows: list[list[Any]] = []
-    for domain in ("patients", "stays", "diagnostics", "monitoring"):
+    for domain in ("patients", "stays", "diagnostics", "monitoring", "acts"):
         for item in profile[domain]["per_file"]:
             row_count = item.get("rows", item.get("stay_entries", 0))
             inventory_rows.append(
@@ -586,6 +702,11 @@ def build_markdown(profile: dict[str, Any]) -> str:
         ["Monitoring", "Relevés hors fenêtre du séjour", value(monitoring, "rows_rejected_by_stay_window_rule"), "Observation"],
         ["Monitoring", "Liés à un séjour de durée invalide", value(monitoring, "rows_on_rejected_silver_stay"), "Conserver si capteur valide"],
         ["Monitoring", "Lignes rejetées en Silver", value(monitoring, "rows_rejected_by_all_silver_rules"), "Rejet"],
+        ["Actes", "Lignes reçues", acts["rows"], "Information"],
+        ["Actes", "Codes CCAM inconnus", value(acts, "unknown_ccam_codes"), "Rejet"],
+        ["Actes", "Séjours inconnus", value(acts, "unknown_stay_ids"), "Rejet"],
+        ["Actes", "Liés à un séjour de durée invalide", value(acts, "rows_on_rejected_silver_stay"), "Conserver"],
+        ["Actes", "Lignes acceptées en Silver", value(acts, "rows_accepted_silver"), "Conserver"],
     ]
 
     return f"""# Profilage des fichiers sources
@@ -643,9 +764,18 @@ Décision Silver : pseudonymiser `patient_id`, supprimer nom/prénom/NIR, géné
 
 Les bornes Silver sont des bornes de **validité**. Elles sont différentes des seuils d'alerte du corrigé Gold : SpO2 < 92, fréquence cardiaque < 50 ou > 100, température > 38,5 °C.
 
+## Actes et nouveaux référentiels
+
+- **{acts['rows']:,} actes** reçus et **{value(acts, 'rows_accepted_silver'):,} acceptés**.
+- Codes CCAM inconnus : **{value(acts, 'unknown_ccam_codes')}** ; séjours inconnus : **{value(acts, 'unknown_stay_ids')}**.
+- Doublons sur `(stay_id, code_ccam, acte_ts)` : **{value(acts, 'duplicate_events_across_all_files')}**.
+- **{value(acts, 'rows_on_rejected_silver_stay')} actes** sont liés à un séjour dont la durée est invalide. Ils restent conservés, car l'acte respecte ses propres règles.
+- Le référentiel contient **{profile['references']['ccam']['rows']} codes CCAM** sans doublon ni tarif invalide.
+- La description couvre **{profile['references']['service_descriptions']['rows']} services sur {profile['references']['services']['rows']}**. Le service non décrit est conservé avec ses nouveaux attributs à `NULL`.
+
 ## Conséquences pour l'implémentation
 
-1. Charger d'abord les référentiels et patients, puis les séjours, diagnostics et relevés afin de contrôler l'intégrité des clés.
+1. Charger d'abord les référentiels et patients, puis les séjours, diagnostics, relevés et actes afin de contrôler l'intégrité des clés.
 2. Pseudonymiser avant l'entrée dans l'entrepôt et ne jamais tracer de donnée identifiante dans les rejets.
 3. Écrire les lignes invalides dans `audit.quality_rejects` avec la règle, le lot et le fichier source.
 4. Partitionner `fact_monitoring` par mois de `measurement_date_key` ; ne pas créer une partition par jour.
@@ -659,18 +789,27 @@ def main() -> None:
     if not source.is_dir():
         raise SystemExit(f"Source directory not found: {source}")
 
-    paths = sorted(path for path in source.rglob("*") if path.is_file())
+    paths = sorted(
+        path
+        for path in source.rglob("*")
+        if path.is_file()
+        and not any(part.startswith(".") for part in path.relative_to(source).parts)
+    )
     patient_paths = [path for path in paths if path.match("*/patients/*/patients.csv")]
     stay_paths = [path for path in paths if path.match("*/sejours/*/sejours.csv")]
     diagnostic_paths = [path for path in paths if path.match("*/diagnostics/*/diagnostics.json")]
     monitoring_paths = [path for path in paths if path.match("*/monitoring/*/monitoring.parquet")]
+    act_paths = [path for path in paths if path.match("*/actes/*/actes.parquet")]
     reference_paths = [path for path in paths if "/referentiels/" in f"/{path.as_posix()}"]
 
     patients, patient_ids = profile_patients(patient_paths)
-    references, service_codes, diagnosis_codes = profile_references(reference_paths)
+    references, service_codes, diagnosis_codes, ccam_codes = profile_references(
+        reference_paths
+    )
     stays, stays_by_id = profile_stays(stay_paths, patient_ids, service_codes)
     diagnostics = profile_diagnostics(diagnostic_paths, stays_by_id, diagnosis_codes)
     monitoring = profile_monitoring(monitoring_paths, stays_by_id)
+    acts = profile_acts(act_paths, stays_by_id, ccam_codes)
 
     profile = {
         "generated_at": datetime.now(timezone.utc).isoformat(),
@@ -684,6 +823,7 @@ def main() -> None:
         "stays": stays,
         "diagnostics": diagnostics,
         "monitoring": monitoring,
+        "acts": acts,
     }
 
     args.json_output.parent.mkdir(parents=True, exist_ok=True)

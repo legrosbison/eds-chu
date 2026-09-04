@@ -11,7 +11,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 
-from ingest_lake import ingest, pseudonymize  # noqa: E402
+from ingest_lake import discover_files, domain_for, ingest, pseudonymize  # noqa: E402
 
 
 class LakeIngestionTests(unittest.TestCase):
@@ -88,6 +88,30 @@ class LakeIngestionTests(unittest.TestCase):
 
             with self.assertRaisesRegex(RuntimeError, "PSEUDONYMIZATION_KEY differs"):
                 ingest(source, lake, b"another-long-test-secret-of-32-bytes")
+
+    def test_evolution_sources_are_supported_and_hidden_files_are_ignored(self) -> None:
+        self.assertEqual(
+            domain_for(Path("referentiels/2026-08-29/description_service.csv")),
+            "description_service",
+        )
+        self.assertEqual(
+            domain_for(Path("referentiels/2026-08-29/ccam.csv")),
+            "ccam",
+        )
+        self.assertEqual(
+            domain_for(Path("actes/2026-08-29/actes.parquet")),
+            "actes",
+        )
+
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            source = Path(temporary_directory)
+            visible = source / "actes" / "2026-08-29" / "actes.parquet"
+            hidden = source / ".DS_Store"
+            visible.parent.mkdir(parents=True)
+            visible.touch()
+            hidden.touch()
+
+            self.assertEqual(discover_files(source), [visible])
 
 
 if __name__ == "__main__":

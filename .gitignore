@@ -1,5 +1,6 @@
 # Données sources : elles ne doivent pas être publiées dans Git
 source-filestorage/
+source-evolution/
 
 # Supports fournis séparément
 *.pdf

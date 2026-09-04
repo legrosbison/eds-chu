@@ -94,7 +94,11 @@ def domain_for(relative_path: Path) -> str:
             return "services"
         if relative_path.name == "cim10.csv":
             return "cim10"
-    if domain in {"patients", "sejours", "diagnostics", "monitoring"}:
+        if relative_path.name == "description_service.csv":
+            return "description_service"
+        if relative_path.name == "ccam.csv":
+            return "ccam"
+    if domain in {"patients", "sejours", "diagnostics", "monitoring", "actes"}:
         return domain
     raise ValueError(f"Unsupported source file: {relative_path}")
 
@@ -259,7 +263,12 @@ def assert_lake_privacy(path: Path, domain: str) -> None:
 
 
 def discover_files(source: Path) -> list[Path]:
-    return sorted(path for path in source.rglob("*") if path.is_file())
+    return sorted(
+        path
+        for path in source.rglob("*")
+        if path.is_file()
+        and not any(part.startswith(".") for part in path.relative_to(source).parts)
+    )
 
 
 def ingest(source: Path, lake: Path, secret: bytes, dry_run: bool = False) -> dict[str, int]:

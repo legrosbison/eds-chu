@@ -117,11 +117,12 @@ Les tables Silver sont créées par
 [`sql/20_silver_tables.sql`](../sql/20_silver_tables.sql). Les règles se trouvent
 dans [`sql/silver`](../sql/silver) et s'exécutent dans cet ordre :
 
-1. référentiels service et CIM-10 ;
+1. référentiels service, description de service, CIM-10 et CCAM ;
 2. patients ;
 3. séjours ;
 4. diagnostics ;
 5. monitoring.
+6. actes.
 
 Cet ordre suit les dépendances. Par exemple, un séjour a besoin d'un patient et
 d'un service connus. Un diagnostic ou un relevé de monitoring a besoin d'un
@@ -133,14 +134,17 @@ Quelques règles concrètes :
 - une sortie renseignée sans mode de sortie rejette le séjour ;
 - une fréquence cardiaque doit rester entre 20 et 250 bpm ;
 - une anomalie de durée du séjour ne rejette pas en cascade un diagnostic ou un
-  relevé qui respecte ses propres règles.
+  relevé qui respecte ses propres règles ;
+- un acte récupère son service depuis le séjour Bronze, puis `service_code` est
+  stocké dans `fact_acte` afin de ne pas joindre deux tables de faits.
 
 Une ligne invalide est écrite dans `audit.quality_rejects` avec sa règle, sa clé,
 son fichier et son numéro de ligne. Elle reste également en Bronze.
 
 ## 6. Volumes vérifiés
 
-Le pipeline a été exécuté sur les 89 fichiers du jeu corrigé :
+Le pipeline a été exécuté sur les 92 fichiers, y compris le dépôt d'évolution du
+29 août :
 
 | Jeu de données |                       Bronze |          Silver accepté | Rejeté |
 | -------------- | ---------------------------: | ----------------------: | -----: |
@@ -150,6 +154,9 @@ Le pipeline a été exécuté sur les 89 fichiers du jeu corrigé :
 | Monitoring     |                       41 778 |                  40 920 |    858 |
 | Services       |                            8 |                       8 |      0 |
 | CIM-10         |                           13 |                      13 |      0 |
+| Descriptions service |                       7 | 7 services enrichis        |      0 |
+| CCAM           |                            8 |                       8 |      0 |
+| Actes          |                        8 112 |                   8 112 |      0 |
 
 Pour les patients, Bronze contient les trois photographies quotidiennes. La
 table `silver.dim_patient` utilise `ReplacingMergeTree` et conserve la version la
@@ -158,6 +165,10 @@ plus récente par `patient_key`. Pour compter immédiatement l'état courant :
 ```sql
 SELECT count() FROM silver.dim_patient FINAL;
 ```
+
+La description de service est volontairement incomplète : `NEURO` reste dans
+`dim_service` avec catégorie, capacité et pôle à `NULL`. Elle n'est ni supprimée
+ni complétée avec une valeur inventée.
 
 ## 7. Contrôler l'exécution
 

@@ -13,9 +13,22 @@ WHERE batch_id = {batch_id:UUID}
   AND (empty(trimBoth(service_code)) OR empty(trimBoth(ifNull(service_label, ''))));
 
 INSERT INTO silver.dim_service
+(
+    service_code,
+    service_label,
+    categorie,
+    capacite_lits,
+    pole,
+    source_date,
+    batch_id,
+    processed_at
+)
 SELECT
     trimBoth(service_code),
     argMax(trimBoth(ifNull(service_label, '')), source_row_number),
+    CAST(NULL, 'Nullable(String)'),
+    CAST(NULL, 'Nullable(UInt16)'),
+    CAST(NULL, 'Nullable(String)'),
     max(source_date),
     batch_id,
     now64(3, 'UTC')

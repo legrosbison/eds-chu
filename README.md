@@ -72,16 +72,16 @@ Pour utiliser toutes les interactions, clonez le dépôt puis ouvrez `docs/data-
 
 Le modèle est une constellation constituée de :
 
-- quatre dimensions : patient, service, date et diagnostic ;
-- trois faits : séjour, diagnostic associé à un séjour et relevé de monitoring.
+- cinq dimensions : patient, service, date, diagnostic et CCAM ;
+- quatre faits : séjour, diagnostic associé, relevé de monitoring et acte médical.
 
 ### Gold
 
 - [Modèle Gold, formules et explication des KPI](docs/data-model-gold.md)
 
-Gold contient six tables directement exploitables dans Metabase : DMS,
-activité des urgences, réadmission à 30 jours, alertes de monitoring, prévalence
-des pathologies et démographie des cohortes.
+Gold contient les six KPI initiaux et les cinq KPI de l'évolution : activité et
+DMS par catégorie, actes par service et par type, densité par lit et montant
+facturé par service.
 
 ## Dashboards et exploitation
 
@@ -146,3 +146,4 @@ dans [la documentation du pipeline](docs/pipeline-lake-bronze-silver.md).
 - [x] Tables Gold et KPI
 - [x] Dashboards pilotage et recherche
 - [x] Orchestration, journalisation et documentation d'exploitation
+- [x] Évolution du 29 août : services enrichis, CCAM, actes et nouveaux KPI

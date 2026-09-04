@@ -1,9 +1,9 @@
 {
-  "generated_at": "2026-09-02T14:52:46.440764+00:00",
+  "generated_at": "2026-09-03T13:29:41.414704+00:00",
   "source_root": "source-filestorage",
   "inventory": {
-    "file_count": 89,
-    "total_bytes": 3176844
+    "file_count": 92,
+    "total_bytes": 3277894
   },
   "patients": {
     "summary": {
@@ -100,6 +100,29 @@
       "missing_codes": 0,
       "missing_labels": 0,
       "duplicate_codes": 0
+    },
+    "ccam": {
+      "file": "source-filestorage/referentiels/2026-08-29/ccam.csv",
+      "bytes": 298,
+      "rows": 8,
+      "missing_codes": 0,
+      "missing_labels": 0,
+      "duplicate_codes": 0,
+      "invalid_tariffs": 0
+    },
+    "service_descriptions": {
+      "file": "source-filestorage/referentiels/2026-08-29/description_service.csv",
+      "bytes": 269,
+      "rows": 7,
+      "missing_codes": 0,
+      "missing_categories": 0,
+      "missing_capacities": 0,
+      "missing_poles": 0,
+      "duplicate_codes": 0,
+      "invalid_capacities": 0,
+      "services_without_description": [
+        "NEURO"
+      ]
     }
   },
   "stays": {
@@ -1426,6 +1449,28 @@
         "spo2_out_of_range": 2,
         "rows_rejected_by_required_quality_rules": 2,
         "rows_rejected_by_all_silver_rules": 2
+      }
+    ]
+  },
+  "acts": {
+    "summary": {
+      "rows": 8112,
+      "rows_accepted_silver": 8112,
+      "rows_on_rejected_silver_stay": 82,
+      "duplicate_events_within_file": 0,
+      "distinct_act_events": 8112,
+      "duplicate_events_across_all_files": 0
+    },
+    "per_file": [
+      {
+        "date": "2026-08-29",
+        "file": "source-filestorage/actes/2026-08-29/actes.parquet",
+        "bytes": 100483,
+        "row_groups": 1,
+        "duplicate_events_within_file": 0,
+        "rows": 8112,
+        "rows_accepted_silver": 8112,
+        "rows_on_rejected_silver_stay": 82
       }
     ]
   }

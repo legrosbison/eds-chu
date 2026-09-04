@@ -15,7 +15,8 @@ Administrateur   → les deux
 
 ## Dashboard Pilotage hospitalier
 
-Il contient cinq cartes :
+Il contient dix cartes : les cinq indicateurs initiaux et les cinq indicateurs
+du dépôt d'évolution.
 
 | Carte                             | Visualisation | Source Gold                  |
 | --------------------------------- | ------------- | ---------------------------- |
@@ -24,9 +25,18 @@ Il contient cinq cartes :
 | DMS par service                   | barres        | `kpi_dms_service`            |
 | Activité quotidienne des urgences | courbes       | `kpi_emergency_daily`        |
 | Alertes de monitoring par jour    | courbes       | `kpi_monitoring_alert_daily` |
+| Activité et DMS par catégorie     | tableau       | `kpi_activity_dms_category`  |
+| Actes par service                 | tableau       | `kpi_acts_service`           |
+| Actes par type CCAM               | barres        | `kpi_acts_type`              |
+| Densité d'actes par lit           | barres        | `kpi_act_density_bed`        |
+| Montant facturé par service       | barres        | `kpi_billed_amount_service`  |
 
 Cette séparation répond au besoin de la direction : suivre l'activité et la
 qualité des soins sans accéder aux analyses de cohortes de recherche.
+
+Neurologie reste présente dans les cartes d'activité et de facturation. Elle
+n'apparaît pas dans la densité par lit, car le nouveau référentiel ne fournit
+pas sa capacité et le projet n'invente pas cette valeur.
 
 ## Dashboard Recherche clinique
 

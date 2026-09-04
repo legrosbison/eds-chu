@@ -4,7 +4,7 @@
 
 ## Principe retenu
 
-Le modèle Silver est une **constellation de faits** : plusieurs tables de faits utilisent les mêmes dimensions. Cela permet d'analyser les séjours, les diagnostics et le monitoring selon les mêmes axes, sans mélanger leurs grains.
+Le modèle Silver est une **constellation de faits** : plusieurs tables de faits utilisent les mêmes dimensions. Cela permet d'analyser les séjours, les diagnostics, le monitoring et les actes selon les mêmes axes, sans mélanger leurs grains.
 
 ```mermaid
 erDiagram
@@ -15,12 +15,15 @@ erDiagram
     DIM_SERVICE ||--o{ FACT_STAY : "service"
     DIM_SERVICE ||--o{ FACT_DIAGNOSIS : "service"
     DIM_SERVICE ||--o{ FACT_MONITORING : "service"
+    DIM_SERVICE ||--o{ FACT_ACTE : "service du sejour"
 
     DIM_DATE ||--o{ FACT_STAY : "admission / sortie"
     DIM_DATE ||--o{ FACT_DIAGNOSIS : "date du sejour"
     DIM_DATE ||--o{ FACT_MONITORING : "date du releve"
+    DIM_DATE ||--o{ FACT_ACTE : "date de l'acte"
 
     DIM_DIAGNOSIS ||--o{ FACT_DIAGNOSIS : "code CIM-10"
+    DIM_CCAM ||--o{ FACT_ACTE : "code CCAM"
 
     DIM_PATIENT {
         String patient_key PK "pseudonyme stable"
@@ -32,6 +35,9 @@ erDiagram
     DIM_SERVICE {
         String service_code PK
         String service_label
+        Nullable_String categorie
+        Nullable_UInt16 capacite_lits
+        Nullable_String pole
     }
 
     DIM_DATE {
@@ -45,6 +51,12 @@ erDiagram
     DIM_DIAGNOSIS {
         String diagnosis_code PK
         String diagnosis_label
+    }
+
+    DIM_CCAM {
+        String code_ccam PK
+        String libelle
+        Decimal tarif_euros
     }
 
     FACT_STAY {
@@ -80,6 +92,14 @@ erDiagram
         UInt8 spo2 "mesure"
         Decimal temp_c "mesure"
     }
+
+    FACT_ACTE {
+        String stay_id "dimension degeneree"
+        String service_code FK
+        String code_ccam FK
+        Date act_date_key FK
+        DateTime acte_ts
+    }
 ```
 
 ## Dimensions et faits
@@ -87,12 +107,14 @@ erDiagram
 | Table             | Type             | Grain / rôle                                                                                          |
 | ----------------- | ---------------- | ----------------------------------------------------------------------------------------------------- |
 | `dim_patient`     | Dimension        | Un patient pseudonymisé ; analyse par année de naissance, sexe ou région                              |
-| `dim_service`     | Dimension        | Un service hospitalier ; analyse par service                                                          |
+| `dim_service`     | Dimension        | Un service hospitalier ; analyse par service, catégorie ou pôle                                       |
 | `dim_date`        | Dimension        | Un jour ; analyse par jour, semaine, mois ou année                                                    |
 | `dim_diagnosis`   | Dimension        | Un code CIM-10 et son libellé ; analyse par pathologie                                                |
+| `dim_ccam`        | Dimension        | Un code d'acte, son libellé et son tarif                                                              |
 | `fact_stay`       | Fait             | Une ligne par séjour ; comptage des passages et mesure de durée                                       |
 | `fact_diagnosis`  | Fait sans mesure | Une ligne par diagnostic associé à un séjour ; les patients distincts donnent la taille de la cohorte |
 | `fact_monitoring` | Fait             | Une ligne par relevé horodaté ; mesures de fréquence cardiaque, SpO2 et température                   |
+| `fact_acte`       | Fait             | Une ligne par acte horodaté réalisé pendant un séjour                                                 |
 
 `fact_diagnosis` est un **fait sans mesure** : il représente l'événement « un diagnostic est associé à un séjour ». Il est donc comptable même s'il ne contient pas de montant ou de durée.
 
@@ -121,7 +143,16 @@ de supprimer 127 diagnostics et 520 relevés supplémentaires par cascade.
 - Une dimension est placée du côté **1** et un fait du côté **N** : un patient, un service ou une date peut apparaître dans plusieurs événements.
 - `dim_diagnosis` ne rejoint que `fact_diagnosis`, car un code CIM-10 ne décrit ni un séjour entier ni une mesure de monitoring.
 - Les clés `patient_key`, `service_code` et les clés de date sont recopiées dans chaque fait pendant l'enrichissement Silver. On interroge ainsi directement une dimension et un fait, sans faire de jointure entre deux grosses tables de faits. Pour `fact_diagnosis`, la date est celle de l'admission car la source diagnostic ne fournit pas de date propre.
-- `stay_id` est conservé dans les trois faits comme **dimension dégénérée** : il permet de retrouver les événements d'un séjour, mais ne nécessite pas une table de dimension séparée.
+- `fact_acte` reçoit son `service_code` depuis le contexte du séjour en Bronze. Les KPI joignent ensuite directement `fact_acte` à `dim_service`, jamais `fact_acte` à `fact_stay`.
+- `stay_id` est conservé dans les faits comme **dimension dégénérée** : il permet de retrouver les événements d'un séjour, mais ne nécessite pas une table de dimension séparée.
+
+## Évolution du 29 août : services incomplets
+
+Le référentiel de description contient sept services alors que `dim_service` en
+contient huit. `NEURO` est conservé avec `categorie`, `capacite_lits` et `pole`
+à `NULL`. Il apparaît sous « Non renseignée » dans les agrégats par catégorie et
+sa densité par lit n'est pas calculée. Ce choix évite de perdre ses séjours et
+ses actes ou d'inventer une capacité.
 
 ## Qualité, RGPD et traçabilité
 
@@ -131,6 +162,7 @@ de supprimer 127 diagnostics et 520 relevés supplémentaires par cascade.
 - Les diagnostics JSON sont aplatis avant leur chargement dans `fact_diagnosis`.
 - Les relevés hors bornes sont rejetés : fréquence cardiaque 20–250, SpO2 50–100 %, température 30–45 °C.
 - Chaque fait applique ses propres règles : une anomalie de durée dans `fact_stay` n'invalide pas automatiquement un diagnostic ou un relevé.
+- La même règle s'applique aux actes : les 8 112 actes valides sont conservés, y compris ceux liés à un séjour dont seule la durée a été rejetée.
 - Les tables conservent les colonnes de traçabilité utiles. Les rejets sont enregistrés dans la table technique `audit.quality_rejects`, séparée du modèle analytique et sans donnée identifiante.
 
 Les agrégats comme la DMS, les réadmissions, les passages aux urgences et les cohortes restent en Gold. Les seuils d'alerte utilisés pour l'exercice sont ceux du corrigé : SpO2 < 92, fréquence cardiaque < 50 ou > 100 et température > 38,5 °C.

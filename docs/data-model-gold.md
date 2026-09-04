@@ -10,7 +10,7 @@ Silver = une ligne par séjour, diagnostic ou relevé
 Gold   = une ligne par service, jour, pathologie ou cohorte
 ```
 
-## 2. Origine des six KPI
+## 2. Origine des onze KPI
 
 ```mermaid
 flowchart LR
@@ -22,6 +22,17 @@ flowchart LR
     FD --> DEMO[gold.kpi_cohort_demographics]
     DD[silver.dim_diagnosis] --> PREV
     DP[silver.dim_patient] --> DEMO
+    FS --> CAT[gold.kpi_activity_dms_category]
+    DS[silver.dim_service] --> CAT
+    FA[silver.fact_acte] --> ACTSVC[gold.kpi_acts_service]
+    FA --> AT[gold.kpi_acts_type]
+    FA --> DENS[gold.kpi_act_density_bed]
+    FA --> BILL[gold.kpi_billed_amount_service]
+    DS --> ACTSVC
+    DS --> DENS
+    DS --> BILL
+    CC[silver.dim_ccam] --> AT
+    CC --> BILL
 ```
 
 | Table Gold                   | Une ligne représente                         |
@@ -32,6 +43,11 @@ flowchart LR
 | `kpi_monitoring_alert_daily` | un jour de surveillance                      |
 | `kpi_pathology_prevalence`   | une pathologie CIM-10                        |
 | `kpi_cohort_demographics`    | une pathologie, une tranche d'âge et un sexe |
+| `kpi_activity_dms_category`  | une catégorie de service                     |
+| `kpi_acts_service`           | un service                                   |
+| `kpi_acts_type`              | un code CCAM                                 |
+| `kpi_act_density_bed`        | un service                                   |
+| `kpi_billed_amount_service`  | un service                                   |
 
 ## 3. DMS par service
 
@@ -115,7 +131,37 @@ Comme pour la prévalence, `publishable_patient_count` vaut `NULL` si la cellule
 contient moins de 5 patients. Le dashboard destiné à la diffusion doit utiliser
 cette colonne et non le compte brut.
 
-## 9. Reconstruction et contrôles
+## 9. KPI de l'évolution du 29 août
+
+### Activité et DMS par catégorie
+
+`stay_count` compte tous les séjours valides. `closed_stay_count` est le nombre
+de séjours clos utilisé pour la DMS ; un séjour en cours n'a pas de durée
+finale. Neurologie, qui n'est pas décrite dans le nouveau référentiel, reste
+visible dans la catégorie `Non renseignee`.
+
+### Actes par service
+
+Le service a été recopié dans `fact_acte` pendant la transformation Silver. Le
+calcul ne relie donc jamais deux tables de faits :
+
+```text
+nombre moyen = nombre d'actes / séjours distincts présents dans fact_acte
+```
+
+Avec le dépôt reçu, `fact_acte` contient 8 112 actes répartis sur 5 096 séjours
+ayant au moins un acte.
+
+### Actes par type, densité et facturation
+
+- le type d'acte vient de `dim_ccam` ;
+- `acts_per_bed = act_count / capacite_lits` ;
+- la densité de Neurologie vaut `NULL`, car sa capacité n'est pas fournie ;
+- `billed_amount_euros = somme(tarif_euros)` pour tous les actes du service.
+
+Le montant total contrôlé est de `2 199 450 €`.
+
+## 10. Reconstruction et contrôles
 
 Gold est entièrement dérivé de Silver et ne contient que quelques lignes. Il
 est donc reconstruit à chaque exécution avec `TRUNCATE` puis `INSERT SELECT` :
@@ -134,6 +180,15 @@ SELECT * FROM gold.kpi_readmission_30d;
 
 SELECT * FROM gold.kpi_monitoring_alert_daily
 ORDER BY date_key;
+
+SELECT * FROM gold.kpi_activity_dms_category
+ORDER BY categorie;
+
+SELECT * FROM gold.kpi_acts_service
+ORDER BY act_count DESC;
+
+SELECT sum(billed_amount_euros)
+FROM gold.kpi_billed_amount_service;
 
 SELECT diagnosis_code, patient_count, publishable_patient_count
 FROM gold.kpi_pathology_prevalence
